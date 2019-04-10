@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Value {
     Integer(i64),
     Float(f64),
@@ -10,7 +10,19 @@ pub enum Value {
 }
 
 pub struct ProgramState {
-    variables: HashMap<String, Value>
+    variables: HashMap<String, Value>,
+}
+
+pub enum Instruction {
+    Assign(String, Value),
+}
+
+impl Instruction {
+    pub fn execute(&self, state: &mut ProgramState) {
+        match self {
+            Instruction::Assign(name, value) => state.insert(name.to_string(), value.clone()),
+        }
+    }
 }
 
 impl ProgramState {
@@ -34,8 +46,16 @@ mod tests {
     #[test]
     fn insert_variable() {
         let mut environment = ProgramState::new();
-        environment.insert(String::from("x"),Value::Integer(3));
-        assert_eq!(environment.get("x"),Some(&Value::Integer(3)));
-        assert_eq!(environment.get("y"),None);
+        environment.insert(String::from("x"), Value::Integer(3));
+        assert_eq!(environment.get("x"), Some(&Value::Integer(3)));
+        assert_eq!(environment.get("y"), None);
+    }
+
+    #[test]
+    fn execute_instruction() {
+        let mut environment = ProgramState::new();
+        Instruction::Assign(String::from("x"), Value::Float(4.0)).execute(&mut environment);
+        assert_eq!(environment.get("x"), Some(&Value::Float(4.0)));
+        assert_eq!(environment.get("y"), None);
     }
 }
