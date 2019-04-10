@@ -98,8 +98,8 @@ mod tests {
     fn evaluate_expression() {
         let mut environment = ProgramState::new();
         environment.insert(String::from("x"), Value::Integer(-3));
-        assert_eq!(Expression::Lit(Value::Float(4.0)), Value::Float(4.0));
-        assert_eq!(Expression::Var(String::from("x")), Value::Integer(-3));
+        assert_eq!(Expression::Lit(Value::Float(4.0)).evaluate(&environment), Value::Float(4.0));
+        assert_eq!(Expression::Var(String::from("x")).evaluate(&environment), Value::Integer(-3));
     }
 
     #[test]
