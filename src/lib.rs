@@ -12,6 +12,7 @@ pub enum Value {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Function {
+    arguments: Vec<String>,
     instructions: Vec<Instruction>,
     ret_val: Expression,
 }
@@ -28,20 +29,34 @@ pub enum Instruction {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
-    Call(String),
+    Call(String, Vec<String>),
     Var(String),
     Lit(Value),
 }
 
 impl Function {
-    pub fn from(instructions: Vec<Instruction>, ret_val: Expression) -> Self {
+    pub fn from(
+        arguments: Vec<String>,
+        instructions: Vec<Instruction>,
+        ret_val: Expression,
+    ) -> Self {
         Function {
+            arguments,
             instructions,
             ret_val,
         }
     }
-    pub fn call(&self) -> Value {
+    pub fn call(&self, state: &ProgramState, args: &Vec<String>) -> Value {
         let mut inner_state = ProgramState::new();
+        for (inner_arg, outer_arg) in self.arguments.iter().zip(args) {
+            inner_state.insert(
+                inner_arg.clone(),
+                state
+                    .get(outer_arg)
+                    .expect("Tried to call a nonexistent argument")
+                    .clone(),
+            )
+        }
         for instruction in self.instructions.iter() {
             instruction.execute(&mut inner_state)
         }
@@ -60,8 +75,8 @@ impl Instruction {
 impl Expression {
     pub fn evaluate(&self, state: &ProgramState) -> Value {
         match self {
-            Expression::Call(name) => match state.get(name).expect("Syntax Error") {
-                Value::Function(inner) => inner.call(),
+            Expression::Call(name, args) => match state.get(name).expect("Syntax Error") {
+                Value::Function(inner) => inner.call(state,args),
                 _ => panic!("Tried to call a non-function value"),
             },
             Expression::Var(id) => state.get(id).expect("Syntax Error").clone(),
@@ -112,6 +127,7 @@ mod tests {
         environment.insert(
             String::from("f"),
             Value::Function(Box::new(Function::from(
+                vec![],
                 vec![Instruction::Assign(
                     String::from("x"),
                     Expression::Lit(Value::Text(String::from("Hi!"))),
@@ -128,7 +144,7 @@ mod tests {
             Value::Integer(-3)
         );
         assert_eq!(
-            Expression::Call(String::from("f")).evaluate(&environment),
+            Expression::Call(String::from("f"), vec![]).evaluate(&environment),
             Value::Text(String::from("Hi!"))
         )
     }
@@ -136,13 +152,13 @@ mod tests {
     #[test]
     fn call_function() {
         let mut environment = ProgramState::new();
+
+        environment.insert(String::from("x"), Value::Float(-2.5));
         let function = Function::from(
-            vec![Instruction::Assign(
-                String::from("x"),
-                Expression::Lit(Value::Float(4.0)),
-            )],
-            Expression::Var(String::from("x")),
+            vec![String::from("y")],
+            vec![],
+            Expression::Var(String::from("y")),
         );
-        assert_eq!(function.call(), Value::Float(4.0));
+        assert_eq!(function.call(&environment,&vec![String::from("x")]), Value::Float(-2.5));
     }
 }
