@@ -95,6 +95,14 @@ mod tests {
     }
 
     #[test]
+    fn evaluate_expression() {
+        let mut environment = ProgramState::new();
+        environment.insert(String::from("x"), Value::Integer(-3));
+        assert_eq!(Expression::Lit(Value::Float(4.0)), Value::Float(4.0));
+        assert_eq!(Expression::Var(String::from("x")), Value::Integer(-3));
+    }
+
+    #[test]
     fn call_function() {
         let mut environment = ProgramState::new();
         let function = Function::from(vec![Instruction::Assign(String::from("x"), Expression::Lit(Value::Float(4.0)))],Expression::Var(String::from("x")));
