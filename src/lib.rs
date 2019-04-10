@@ -76,7 +76,7 @@ impl Expression {
     pub fn evaluate(&self, state: &ProgramState) -> Value {
         match self {
             Expression::Call(name, args) => match state.get(name).expect("Syntax Error") {
-                Value::Function(inner) => inner.call(state,args),
+                Value::Function(inner) => inner.call(state, args),
                 _ => panic!("Tried to call a non-function value"),
             },
             Expression::Var(id) => state.get(id).expect("Syntax Error").clone(),
@@ -159,6 +159,9 @@ mod tests {
             vec![],
             Expression::Var(String::from("y")),
         );
-        assert_eq!(function.call(&environment,&vec![String::from("x")]), Value::Float(-2.5));
+        assert_eq!(
+            function.call(&environment, &vec![String::from("x")]),
+            Value::Float(-2.5)
+        );
     }
 }
