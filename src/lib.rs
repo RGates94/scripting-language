@@ -7,21 +7,26 @@ pub enum Value {
     Boolean(bool),
     Text(String),
     Array(Vec<Value>),
+    Function(Box<Function>),
 }
 
+#[derive(Debug, PartialEq, Clone)]
 pub struct Function {
     instructions: Vec<Instruction>,
     ret_val: Expression,
 }
 
+#[derive(Debug, PartialEq, Clone)]
 pub struct ProgramState {
     variables: HashMap<String, Value>,
 }
 
+#[derive(Debug, PartialEq, Clone)]
 pub enum Instruction {
     Assign(String, Expression),
 }
 
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     Var(String),
     Lit(Value),
@@ -31,13 +36,13 @@ impl Function {
     pub fn from(instructions: Vec<Instruction>, ret_val: Expression) -> Self {
         Function {
             instructions,
-            ret_val
+            ret_val,
         }
     }
     pub fn call(&self, state: &mut ProgramState) -> Value {
         for instruction in self.instructions.iter() {
             instruction.execute(state)
-        };
+        }
         self.ret_val.evaluate(state)
     }
 }
@@ -98,14 +103,26 @@ mod tests {
     fn evaluate_expression() {
         let mut environment = ProgramState::new();
         environment.insert(String::from("x"), Value::Integer(-3));
-        assert_eq!(Expression::Lit(Value::Float(4.0)).evaluate(&environment), Value::Float(4.0));
-        assert_eq!(Expression::Var(String::from("x")).evaluate(&environment), Value::Integer(-3));
+        assert_eq!(
+            Expression::Lit(Value::Float(4.0)).evaluate(&environment),
+            Value::Float(4.0)
+        );
+        assert_eq!(
+            Expression::Var(String::from("x")).evaluate(&environment),
+            Value::Integer(-3)
+        );
     }
 
     #[test]
     fn call_function() {
         let mut environment = ProgramState::new();
-        let function = Function::from(vec![Instruction::Assign(String::from("x"), Expression::Lit(Value::Float(4.0)))],Expression::Var(String::from("x")));
+        let function = Function::from(
+            vec![Instruction::Assign(
+                String::from("x"),
+                Expression::Lit(Value::Float(4.0)),
+            )],
+            Expression::Var(String::from("x")),
+        );
         assert_eq!(function.call(&mut environment), Value::Float(4.0));
     }
 }
