@@ -14,13 +14,27 @@ pub struct ProgramState {
 }
 
 pub enum Instruction {
-    Assign(String, Value),
+    Assign(String, Expression),
+}
+
+pub enum Expression {
+    Var(String),
+    Lit(Value),
 }
 
 impl Instruction {
     pub fn execute(&self, state: &mut ProgramState) {
         match self {
-            Instruction::Assign(name, value) => state.insert(name.to_string(), value.clone()),
+            Instruction::Assign(name, expr) => state.insert(name.to_string(), expr.evaluate(state)),
+        }
+    }
+}
+
+impl Expression {
+    pub fn evaluate(&self, state: &ProgramState) -> Value {
+        match self {
+            Expression::Var(id) => state.get(id).expect("Syntax Error").clone(),
+            Expression::Lit(val) => val.clone(),
         }
     }
 }
@@ -54,7 +68,8 @@ mod tests {
     #[test]
     fn execute_instruction() {
         let mut environment = ProgramState::new();
-        Instruction::Assign(String::from("x"), Value::Float(4.0)).execute(&mut environment);
+        Instruction::Assign(String::from("x"), Expression::Lit(Value::Float(4.0)))
+            .execute(&mut environment);
         assert_eq!(environment.get("x"), Some(&Value::Float(4.0)));
         assert_eq!(environment.get("y"), None);
     }
