@@ -9,6 +9,11 @@ pub enum Value {
     Array(Vec<Value>),
 }
 
+pub struct Function {
+    instructions: Vec<Instruction>,
+    ret_val: Expression,
+}
+
 pub struct ProgramState {
     variables: HashMap<String, Value>,
 }
@@ -20,6 +25,21 @@ pub enum Instruction {
 pub enum Expression {
     Var(String),
     Lit(Value),
+}
+
+impl Function {
+    pub fn from(instructions: Vec<Instruction>, ret_val: Expression) -> Self {
+        Function {
+            instructions,
+            ret_val
+        }
+    }
+    pub fn call(&self, state: &mut ProgramState) -> Value {
+        for instruction in self.instructions.iter() {
+            instruction.execute(state)
+        };
+        self.ret_val.evaluate(state)
+    }
 }
 
 impl Instruction {
@@ -72,5 +92,12 @@ mod tests {
             .execute(&mut environment);
         assert_eq!(environment.get("x"), Some(&Value::Float(4.0)));
         assert_eq!(environment.get("y"), None);
+    }
+
+    #[test]
+    fn call_function() {
+        let mut environment = ProgramState::new();
+        let function = Function::from(vec![Instruction::Assign(String::from("x"), Expression::Lit(Value::Float(4.0)))],Expression::Var(String::from("x")));
+        assert_eq!(function.call(&mut environment), Value::Float(4.0));
     }
 }
