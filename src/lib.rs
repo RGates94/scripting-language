@@ -28,6 +28,7 @@ pub enum Instruction {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
+    Call(String),
     Var(String),
     Lit(Value),
 }
@@ -39,11 +40,12 @@ impl Function {
             ret_val,
         }
     }
-    pub fn call(&self, state: &mut ProgramState) -> Value {
+    pub fn call(&self) -> Value {
+        let mut inner_state = ProgramState::new();
         for instruction in self.instructions.iter() {
-            instruction.execute(state)
+            instruction.execute(&mut inner_state)
         }
-        self.ret_val.evaluate(state)
+        self.ret_val.evaluate(&mut inner_state)
     }
 }
 
@@ -58,6 +60,10 @@ impl Instruction {
 impl Expression {
     pub fn evaluate(&self, state: &ProgramState) -> Value {
         match self {
+            Expression::Call(name) => match state.get(name).expect("Syntax Error") {
+                Value::Function(inner) => inner.call(),
+                _ => panic!("Tried to call a non-function value"),
+            },
             Expression::Var(id) => state.get(id).expect("Syntax Error").clone(),
             Expression::Lit(val) => val.clone(),
         }
@@ -103,6 +109,16 @@ mod tests {
     fn evaluate_expression() {
         let mut environment = ProgramState::new();
         environment.insert(String::from("x"), Value::Integer(-3));
+        environment.insert(
+            String::from("f"),
+            Value::Function(Box::new(Function::from(
+                vec![Instruction::Assign(
+                    String::from("x"),
+                    Expression::Lit(Value::Text(String::from("Hi!"))),
+                )],
+                Expression::Var(String::from("x")),
+            ))),
+        );
         assert_eq!(
             Expression::Lit(Value::Float(4.0)).evaluate(&environment),
             Value::Float(4.0)
@@ -111,6 +127,10 @@ mod tests {
             Expression::Var(String::from("x")).evaluate(&environment),
             Value::Integer(-3)
         );
+        assert_eq!(
+            Expression::Call(String::from("f")).evaluate(&environment),
+            Value::Text(String::from("Hi!"))
+        )
     }
 
     #[test]
@@ -123,6 +143,6 @@ mod tests {
             )],
             Expression::Var(String::from("x")),
         );
-        assert_eq!(function.call(&mut environment), Value::Float(4.0));
+        assert_eq!(function.call(), Value::Float(4.0));
     }
 }
