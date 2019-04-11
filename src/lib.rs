@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::ops::{Add, Sub, Mul};
+use std::ops::{Add, Mul, Sub};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Value {
@@ -26,6 +26,8 @@ pub struct State {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
     Assign(String, Expression),
+    Goto(usize),
+    ConditionalJump(Expression, usize, usize),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -42,6 +44,7 @@ pub enum Operator {
     Subtract,
     Multiply,
     Divide,
+    Eq,
 }
 
 impl Function {
@@ -57,18 +60,32 @@ impl Function {
         for (name, value) in self.arguments.iter().zip(args) {
             inner_state.insert(name.clone(), value)
         }
-        for instruction in self.instructions.iter() {
-            instruction.execute(&mut inner_state, globals)
+        let mut current_instruction = 0;
+        while let Some(instruction) = self.instructions.get(current_instruction) {
+            if let Some(line) = instruction.execute(&mut inner_state, globals) {
+                current_instruction = line;
+            } else {
+                current_instruction += 1;
+            }
         }
         self.ret_val.evaluate(&inner_state, globals)
     }
 }
 
 impl Statement {
-    pub fn execute(&self, state: &mut State, globals: &State) {
+    pub fn execute(&self, state: &mut State, globals: &State) -> Option<usize> {
         match self {
             Statement::Assign(name, expr) => {
-                state.insert(name.to_string(), expr.evaluate(state, globals))
+                state.insert(name.to_string(), expr.evaluate(state, globals));
+                None
+            }
+            Statement::Goto(line) => Some(*line),
+            Statement::ConditionalJump(condition, if_true, otherwise) => {
+                if condition.evaluate(state, globals) == Value::Boolean(true) {
+                    Some(*if_true)
+                } else {
+                    Some(*otherwise)
+                }
             }
         }
     }
@@ -95,10 +112,15 @@ impl Expression {
             Expression::Oper(op_code, left, right) => match op_code {
                 Operator::Add => (left.evaluate(state, globals) + right.evaluate(state, globals))
                     .expect("Failed to add"),
-                Operator::Subtract => (left.evaluate(state, globals) - right.evaluate(state, globals))
-                    .expect("Failed to add"),
-                Operator::Multiply => (left.evaluate(state, globals) * right.evaluate(state, globals))
-                    .expect("Failed to add"),
+                Operator::Subtract => (left.evaluate(state, globals)
+                    - right.evaluate(state, globals))
+                .expect("Failed to add"),
+                Operator::Multiply => (left.evaluate(state, globals)
+                    * right.evaluate(state, globals))
+                .expect("Failed to add"),
+                Operator::Eq => {
+                    Value::Boolean(left.evaluate(state, globals) == right.evaluate(state, globals))
+                }
                 _ => panic!("Not implemented"),
             },
         }
@@ -402,7 +424,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn sub_numbers() {
         let mut environment = State::new();
@@ -519,4 +540,53 @@ mod tests {
             Value::Float(5.625)
         );
     }
+
+    #[test]
+    fn fibonacci() {
+        let mut environment = State::new();
+        environment.insert(String::from("x"), Value::Integer(7));
+        environment.insert(
+            String::from("main"),
+            Value::Function(Box::new(Function::from(
+                vec![],
+                vec![
+                    Statement::Assign(String::from("y"), Expression::Lit(Value::Integer(1))),
+                    Statement::Assign(String::from("z"), Expression::Lit(Value::Integer(1))),
+                    Statement::ConditionalJump(
+                        Expression::Oper(
+                            Operator::Eq,
+                            Box::new(Expression::Var(String::from("x"))),
+                            Box::new(Expression::Lit(Value::Integer(0))),
+                        ),
+                        10,
+                        3,
+                    ),
+                    Statement::Assign(
+                        String::from("x"),
+                        Expression::Oper(
+                            Operator::Subtract,
+                            Box::new(Expression::Var(String::from("x"))),
+                            Box::new(Expression::Lit(Value::Integer(1))),
+                        ),
+                    ),
+                    Statement::Assign(
+                        String::from("temp"),
+                        Expression::Oper(
+                            Operator::Add,
+                            Box::new(Expression::Var(String::from("y"))),
+                            Box::new(Expression::Var(String::from("z"))),
+                        ),
+                    ),
+                    Statement::Assign(String::from("y"), Expression::Var(String::from("z"))),
+                    Statement::Assign(String::from("z"), Expression::Var(String::from("temp"))),
+                    Statement::Goto(2),
+                ],
+                Expression::Var(String::from("y")),
+            ))),
+        );
+        assert_eq!(environment.run(), Value::Integer(21));
+        environment.insert(String::from("x"), Value::Integer(8));
+        assert_eq!(environment.run(), Value::Integer(34));
+    }
+
 }
