@@ -108,14 +108,22 @@ impl Add for &Value {
             Value::Integer(lhs) => match rhs {
                 Value::Integer(rhs) => Some(Value::Integer(lhs + rhs)),
                 Value::Float(rhs) => Some(Value::Float(*lhs as f64 + rhs)),
-                _ => None
+                Value::Text(rhs) => Some(Value::Text(format!("{}{}", lhs, rhs))),
+                _ => None,
             },
             Value::Float(lhs) => match rhs {
                 Value::Integer(rhs) => Some(Value::Float(lhs + *rhs as f64)),
                 Value::Float(rhs) => Some(Value::Float(lhs + rhs)),
-                _ => None
-            }
-            _ => None
+                Value::Text(rhs) => Some(Value::Text(format!("{}{}", lhs, rhs))),
+                _ => None,
+            },
+            Value::Text(lhs) => match rhs {
+                Value::Integer(rhs) => Some(Value::Text(format!("{}{}", lhs, rhs))),
+                Value::Float(rhs) => Some(Value::Text(format!("{}{}", lhs, rhs))),
+                Value::Text(rhs) => Some(Value::Text(format!("{}{}", lhs, rhs))),
+                _ => None,
+            },
+            _ => None,
         }
     }
 }
@@ -132,7 +140,6 @@ impl ProgramState {
     pub fn get(&self, key: &str) -> Option<&Value> {
         self.variables.get(key)
     }
-
 }
 
 #[cfg(test)]
@@ -207,29 +214,64 @@ mod tests {
 
         environment.insert(String::from("x"), Value::Integer(-3));
         environment.insert(String::from("y"), Value::Float(2.5));
-        let adder =  Function::from(
-            vec![String::from("y"),String::from("x")],
+        let adder = Function::from(
+            vec![String::from("y"), String::from("x")],
             vec![Instruction::Assign(
                 String::from("z"),
-                Expression::Oper(Operator::Add,String::from("x"),String::from("y")),
+                Expression::Oper(Operator::Add, String::from("x"), String::from("y")),
             )],
-            Expression::Oper(Operator::Add,String::from("z"),String::from("x")),
+            Expression::Oper(Operator::Add, String::from("z"), String::from("x")),
         );
         assert_eq!(
-            adder.call(&environment, &vec![String::from("x"),String::from("x")]),
+            adder.call(&environment, &vec![String::from("x"), String::from("x")]),
             Value::Integer(-9)
         );
         assert_eq!(
-            adder.call(&environment, &vec![String::from("x"),String::from("y")]),
+            adder.call(&environment, &vec![String::from("x"), String::from("y")]),
             Value::Float(2.0)
         );
         assert_eq!(
-            adder.call(&environment, &vec![String::from("y"),String::from("x")]),
+            adder.call(&environment, &vec![String::from("y"), String::from("x")]),
             Value::Float(-3.5)
         );
         assert_eq!(
-            adder.call(&environment, &vec![String::from("y"),String::from("y")]),
+            adder.call(&environment, &vec![String::from("y"), String::from("y")]),
             Value::Float(7.5)
+        );
+    }
+
+    #[test]
+    fn add_text() {
+        let mut environment = ProgramState::new();
+
+        environment.insert(String::from("x"), Value::Integer(-3));
+        environment.insert(String::from("y"), Value::Float(2.5));
+        environment.insert(String::from("h"), Value::Text(String::from("Hello, ")));
+        environment.insert(String::from("w"), Value::Text(String::from("World!")));
+        let adder = Function::from(
+            vec![String::from("x"), String::from("y")],
+            vec![],
+            Expression::Oper(Operator::Add, String::from("x"), String::from("y")),
+        );
+        assert_eq!(
+            adder.call(&environment, &vec![String::from("h"), String::from("w")]),
+            Value::Text(String::from("Hello, World!"))
+        );
+        assert_eq!(
+            adder.call(&environment, &vec![String::from("h"), String::from("x")]),
+            Value::Text(String::from("Hello, -3"))
+        );
+        assert_eq!(
+            adder.call(&environment, &vec![String::from("h"), String::from("y")]),
+            Value::Text(String::from("Hello, 2.5"))
+        );
+        assert_eq!(
+            adder.call(&environment, &vec![String::from("x"), String::from("w")]),
+            Value::Text(String::from("-3World!"))
+        );
+        assert_eq!(
+            adder.call(&environment, &vec![String::from("y"), String::from("w")]),
+            Value::Text(String::from("2.5World!"))
         );
     }
 }
