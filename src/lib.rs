@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::ops::Add;
+use std::ops::{Add, Sub, Mul};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Value {
@@ -95,6 +95,10 @@ impl Expression {
             Expression::Oper(op_code, left, right) => match op_code {
                 Operator::Add => (left.evaluate(state, globals) + right.evaluate(state, globals))
                     .expect("Failed to add"),
+                Operator::Subtract => (left.evaluate(state, globals) - right.evaluate(state, globals))
+                    .expect("Failed to add"),
+                Operator::Multiply => (left.evaluate(state, globals) * right.evaluate(state, globals))
+                    .expect("Failed to add"),
                 _ => panic!("Not implemented"),
             },
         }
@@ -121,6 +125,44 @@ impl Add for Value {
                 Value::Integer(rhs) => Some(Value::Text(format!("{}{}", lhs, rhs))),
                 Value::Float(rhs) => Some(Value::Text(format!("{}{}", lhs, rhs))),
                 Value::Text(rhs) => Some(Value::Text(format!("{}{}", lhs, rhs))),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+}
+
+impl Sub for Value {
+    type Output = Option<Value>;
+    fn sub(self, rhs: Value) -> Option<Value> {
+        match self {
+            Value::Integer(lhs) => match rhs {
+                Value::Integer(rhs) => Some(Value::Integer(lhs - rhs)),
+                Value::Float(rhs) => Some(Value::Float(lhs as f64 - rhs)),
+                _ => None,
+            },
+            Value::Float(lhs) => match rhs {
+                Value::Integer(rhs) => Some(Value::Float(lhs - rhs as f64)),
+                Value::Float(rhs) => Some(Value::Float(lhs - rhs)),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+}
+
+impl Mul for Value {
+    type Output = Option<Value>;
+    fn mul(self, rhs: Value) -> Option<Value> {
+        match self {
+            Value::Integer(lhs) => match rhs {
+                Value::Integer(rhs) => Some(Value::Integer(lhs * rhs)),
+                Value::Float(rhs) => Some(Value::Float(lhs as f64 * rhs)),
+                _ => None,
+            },
+            Value::Float(lhs) => match rhs {
+                Value::Integer(rhs) => Some(Value::Float(lhs * rhs as f64)),
+                Value::Float(rhs) => Some(Value::Float(lhs * rhs)),
                 _ => None,
             },
             _ => None,
@@ -357,6 +399,124 @@ mod tests {
                 &State::new()
             ),
             Value::Text(String::from("2.5World!"))
+        );
+    }
+
+
+    #[test]
+    fn sub_numbers() {
+        let mut environment = State::new();
+
+        environment.insert(String::from("x"), Value::Integer(-3));
+        environment.insert(String::from("y"), Value::Float(2.5));
+        environment.insert(String::from("x1"), Value::Integer(4));
+        environment.insert(String::from("y1"), Value::Float(2.25));
+        let subber = Function::from(
+            vec![String::from("x"), String::from("y")],
+            vec![],
+            Expression::Oper(
+                Operator::Subtract,
+                Box::new(Expression::Var(String::from("x"))),
+                Box::new(Expression::Var(String::from("y"))),
+            ),
+        );
+        assert_eq!(
+            subber.call(
+                vec![
+                    Expression::Var(String::from("x")).evaluate(&environment, &State::new()),
+                    Expression::Var(String::from("x1")).evaluate(&environment, &State::new())
+                ],
+                &State::new()
+            ),
+            Value::Integer(-7)
+        );
+        assert_eq!(
+            subber.call(
+                vec![
+                    Expression::Var(String::from("x")).evaluate(&environment, &State::new()),
+                    Expression::Var(String::from("y")).evaluate(&environment, &State::new())
+                ],
+                &State::new()
+            ),
+            Value::Float(-5.5)
+        );
+        assert_eq!(
+            subber.call(
+                vec![
+                    Expression::Var(String::from("y")).evaluate(&environment, &State::new()),
+                    Expression::Var(String::from("x")).evaluate(&environment, &State::new())
+                ],
+                &State::new()
+            ),
+            Value::Float(5.5)
+        );
+        assert_eq!(
+            subber.call(
+                vec![
+                    Expression::Var(String::from("y")).evaluate(&environment, &State::new()),
+                    Expression::Var(String::from("y1")).evaluate(&environment, &State::new())
+                ],
+                &State::new()
+            ),
+            Value::Float(0.25)
+        );
+    }
+    #[test]
+    fn mult_numbers() {
+        let mut environment = State::new();
+
+        environment.insert(String::from("x"), Value::Integer(-3));
+        environment.insert(String::from("y"), Value::Float(2.5));
+        environment.insert(String::from("x1"), Value::Integer(-4));
+        environment.insert(String::from("y1"), Value::Float(2.25));
+        let multer = Function::from(
+            vec![String::from("x"), String::from("y")],
+            vec![],
+            Expression::Oper(
+                Operator::Multiply,
+                Box::new(Expression::Var(String::from("x"))),
+                Box::new(Expression::Var(String::from("y"))),
+            ),
+        );
+        assert_eq!(
+            multer.call(
+                vec![
+                    Expression::Var(String::from("x")).evaluate(&environment, &State::new()),
+                    Expression::Var(String::from("x1")).evaluate(&environment, &State::new())
+                ],
+                &State::new()
+            ),
+            Value::Integer(12)
+        );
+        assert_eq!(
+            multer.call(
+                vec![
+                    Expression::Var(String::from("x")).evaluate(&environment, &State::new()),
+                    Expression::Var(String::from("y")).evaluate(&environment, &State::new())
+                ],
+                &State::new()
+            ),
+            Value::Float(-7.5)
+        );
+        assert_eq!(
+            multer.call(
+                vec![
+                    Expression::Var(String::from("y")).evaluate(&environment, &State::new()),
+                    Expression::Var(String::from("x")).evaluate(&environment, &State::new())
+                ],
+                &State::new()
+            ),
+            Value::Float(-7.5)
+        );
+        assert_eq!(
+            multer.call(
+                vec![
+                    Expression::Var(String::from("y")).evaluate(&environment, &State::new()),
+                    Expression::Var(String::from("y1")).evaluate(&environment, &State::new())
+                ],
+                &State::new()
+            ),
+            Value::Float(5.625)
         );
     }
 }
