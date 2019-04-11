@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ops::Add;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Value {
@@ -32,6 +33,15 @@ pub enum Expression {
     Call(String, Vec<String>),
     Var(String),
     Lit(Value),
+    Oper(Operator, String, String),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Operator {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
 }
 
 impl Function {
@@ -81,6 +91,23 @@ impl Expression {
             },
             Expression::Var(id) => state.get(id).expect("Syntax Error").clone(),
             Expression::Lit(val) => val.clone(),
+            Expression::Oper(op_code, left, right) => match op_code {
+                Operator::Add => (state.get(left).expect("Syntax Error")
+                    + state.get(right).expect("Syntax Error"))
+                .expect("Failed to add"),
+                _ => panic!("Not implemented"),
+            },
+        }
+    }
+}
+
+impl Add for &Value {
+    type Output = Option<Value>;
+    fn add(self, rhs: &Value) -> Option<Value> {
+        if let (Value::Integer(lhs), Value::Integer(rhs)) = (self, rhs) {
+            Some(Value::Integer(lhs + rhs))
+        } else {
+            None
         }
     }
 }
@@ -162,6 +189,25 @@ mod tests {
         assert_eq!(
             function.call(&environment, &vec![String::from("x")]),
             Value::Float(-2.5)
+        );
+    }
+
+    #[test]
+    fn add_numbers() {
+        let mut environment = ProgramState::new();
+
+        environment.insert(String::from("x"), Value::Integer(-3));
+        let function = Function::from(
+            vec![String::from("y")],
+            vec![Instruction::Assign(
+                String::from("x"),
+                Expression::Lit(Value::Integer(7)),
+            )],
+            Expression::Oper(Operator::Add,String::from("x"),String::from("y")),
+        );
+        assert_eq!(
+            function.call(&environment, &vec![String::from("x")]),
+            Value::Integer(4)
         );
     }
 }
