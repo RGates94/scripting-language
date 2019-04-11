@@ -14,17 +14,17 @@ pub enum Value {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Function {
     arguments: Vec<String>,
-    instructions: Vec<Instruction>,
+    instructions: Vec<Statement>,
     ret_val: Expression,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct ProgramState {
+pub struct State {
     variables: HashMap<String, Value>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Instruction {
+pub enum Statement {
     Assign(String, Expression),
 }
 
@@ -45,11 +45,7 @@ pub enum Operator {
 }
 
 impl Function {
-    pub fn from(
-        arguments: Vec<String>,
-        instructions: Vec<Instruction>,
-        ret_val: Expression,
-    ) -> Self {
+    pub fn from(arguments: Vec<String>, instructions: Vec<Statement>, ret_val: Expression) -> Self {
         Function {
             arguments,
             instructions,
@@ -57,7 +53,7 @@ impl Function {
         }
     }
     pub fn call(&self, args: Vec<Value>) -> Value {
-        let mut inner_state = ProgramState::new();
+        let mut inner_state = State::new();
         for (name, value) in self.arguments.iter().zip(args) {
             inner_state.insert(name.clone(), value)
         }
@@ -68,16 +64,16 @@ impl Function {
     }
 }
 
-impl Instruction {
-    pub fn execute(&self, state: &mut ProgramState) {
+impl Statement {
+    pub fn execute(&self, state: &mut State) {
         match self {
-            Instruction::Assign(name, expr) => state.insert(name.to_string(), expr.evaluate(state)),
+            Statement::Assign(name, expr) => state.insert(name.to_string(), expr.evaluate(state)),
         }
     }
 }
 
 impl Expression {
-    pub fn evaluate(&self, state: &ProgramState) -> Value {
+    pub fn evaluate(&self, state: &State) -> Value {
         match self {
             Expression::Call(name, args) => match state.get(name).expect("Syntax Error") {
                 Value::Function(inner) => {
@@ -124,9 +120,9 @@ impl Add for Value {
     }
 }
 
-impl ProgramState {
+impl State {
     pub fn new() -> Self {
-        ProgramState {
+        State {
             variables: HashMap::new(),
         }
     }
@@ -144,7 +140,7 @@ mod tests {
 
     #[test]
     fn insert_variable() {
-        let mut environment = ProgramState::new();
+        let mut environment = State::new();
         environment.insert(String::from("x"), Value::Integer(3));
         assert_eq!(environment.get("x"), Some(&Value::Integer(3)));
         assert_eq!(environment.get("y"), None);
@@ -152,8 +148,8 @@ mod tests {
 
     #[test]
     fn execute_instruction() {
-        let mut environment = ProgramState::new();
-        Instruction::Assign(String::from("x"), Expression::Lit(Value::Float(4.0)))
+        let mut environment = State::new();
+        Statement::Assign(String::from("x"), Expression::Lit(Value::Float(4.0)))
             .execute(&mut environment);
         assert_eq!(environment.get("x"), Some(&Value::Float(4.0)));
         assert_eq!(environment.get("y"), None);
@@ -161,13 +157,13 @@ mod tests {
 
     #[test]
     fn evaluate_expression() {
-        let mut environment = ProgramState::new();
+        let mut environment = State::new();
         environment.insert(String::from("x"), Value::Integer(-3));
         environment.insert(
             String::from("f"),
             Value::Function(Box::new(Function::from(
                 vec![],
-                vec![Instruction::Assign(
+                vec![Statement::Assign(
                     String::from("x"),
                     Expression::Lit(Value::Text(String::from("Hi!"))),
                 )],
@@ -190,7 +186,7 @@ mod tests {
 
     #[test]
     fn call_function() {
-        let mut environment = ProgramState::new();
+        let mut environment = State::new();
 
         environment.insert(String::from("x"), Value::Float(-2.5));
         let function = Function::from(
@@ -208,13 +204,13 @@ mod tests {
 
     #[test]
     fn add_numbers() {
-        let mut environment = ProgramState::new();
+        let mut environment = State::new();
 
         environment.insert(String::from("x"), Value::Integer(-3));
         environment.insert(String::from("y"), Value::Float(2.5));
         let adder = Function::from(
             vec![String::from("y"), String::from("x")],
-            vec![Instruction::Assign(
+            vec![Statement::Assign(
                 String::from("z"),
                 Expression::Oper(
                     Operator::Add,
@@ -260,7 +256,7 @@ mod tests {
 
     #[test]
     fn add_text() {
-        let mut environment = ProgramState::new();
+        let mut environment = State::new();
 
         environment.insert(String::from("x"), Value::Integer(-3));
         environment.insert(String::from("y"), Value::Float(2.5));
