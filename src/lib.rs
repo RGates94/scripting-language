@@ -33,7 +33,7 @@ pub enum Expression {
     Call(String, Vec<String>),
     Var(String),
     Lit(Value),
-    Oper(Operator, String, String),
+    Oper(Operator, Box<Expression>, Box<Expression>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -92,27 +92,27 @@ impl Expression {
             Expression::Var(id) => state.get(id).expect("Syntax Error").clone(),
             Expression::Lit(val) => val.clone(),
             Expression::Oper(op_code, left, right) => match op_code {
-                Operator::Add => (state.get(left).expect("Syntax Error")
-                    + state.get(right).expect("Syntax Error"))
-                .expect("Failed to add"),
+                Operator::Add => {
+                    (left.evaluate(state) + right.evaluate(state)).expect("Failed to add")
+                }
                 _ => panic!("Not implemented"),
             },
         }
     }
 }
 
-impl Add for &Value {
+impl Add for Value {
     type Output = Option<Value>;
-    fn add(self, rhs: &Value) -> Option<Value> {
+    fn add(self, rhs: Value) -> Option<Value> {
         match self {
             Value::Integer(lhs) => match rhs {
                 Value::Integer(rhs) => Some(Value::Integer(lhs + rhs)),
-                Value::Float(rhs) => Some(Value::Float(*lhs as f64 + rhs)),
+                Value::Float(rhs) => Some(Value::Float(lhs as f64 + rhs)),
                 Value::Text(rhs) => Some(Value::Text(format!("{}{}", lhs, rhs))),
                 _ => None,
             },
             Value::Float(lhs) => match rhs {
-                Value::Integer(rhs) => Some(Value::Float(lhs + *rhs as f64)),
+                Value::Integer(rhs) => Some(Value::Float(lhs + rhs as f64)),
                 Value::Float(rhs) => Some(Value::Float(lhs + rhs)),
                 Value::Text(rhs) => Some(Value::Text(format!("{}{}", lhs, rhs))),
                 _ => None,
@@ -218,9 +218,17 @@ mod tests {
             vec![String::from("y"), String::from("x")],
             vec![Instruction::Assign(
                 String::from("z"),
-                Expression::Oper(Operator::Add, String::from("x"), String::from("y")),
+                Expression::Oper(
+                    Operator::Add,
+                    Box::new(Expression::Var(String::from("x"))),
+                    Box::new(Expression::Var(String::from("y"))),
+                ),
             )],
-            Expression::Oper(Operator::Add, String::from("z"), String::from("x")),
+            Expression::Oper(
+                Operator::Add,
+                Box::new(Expression::Var(String::from("z"))),
+                Box::new(Expression::Var(String::from("x"))),
+            ),
         );
         assert_eq!(
             adder.call(&environment, &vec![String::from("x"), String::from("x")]),
@@ -251,7 +259,11 @@ mod tests {
         let adder = Function::from(
             vec![String::from("x"), String::from("y")],
             vec![],
-            Expression::Oper(Operator::Add, String::from("x"), String::from("y")),
+            Expression::Oper(
+                Operator::Add,
+                Box::new(Expression::Var(String::from("x"))),
+                Box::new(Expression::Var(String::from("y"))),
+            ),
         );
         assert_eq!(
             adder.call(&environment, &vec![String::from("h"), String::from("w")]),
