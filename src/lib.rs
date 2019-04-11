@@ -30,7 +30,7 @@ pub enum Statement {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
-    Call(String, Vec<Expression>),
+    Call(Box<Expression>, Vec<Expression>),
     Var(String),
     Lit(Value),
     Oper(Operator, Box<Expression>, Box<Expression>),
@@ -77,11 +77,7 @@ impl Statement {
 impl Expression {
     pub fn evaluate(&self, state: &State, globals: &State) -> Value {
         match self {
-            Expression::Call(name, args) => match state
-                .get(name)
-                .or(globals.get(name))
-                .expect("Variable not found")
-            {
+            Expression::Call(name, args) => match name.evaluate(state, globals) {
                 Value::Function(inner) => inner.call(
                     args.iter()
                         .map(|expr| expr.evaluate(state, globals))
@@ -198,7 +194,8 @@ mod tests {
             Value::Integer(-3)
         );
         assert_eq!(
-            Expression::Call(String::from("f"), vec![]).evaluate(&environment, &State::new()),
+            Expression::Call(Box::new(Expression::Var(String::from("f"))), vec![])
+                .evaluate(&environment, &State::new()),
             Value::Text(String::from("Hi!"))
         )
     }
@@ -221,7 +218,10 @@ mod tests {
             Value::Function(Box::new(Function::from(
                 vec![String::from("y")],
                 vec![],
-                Expression::Call(String::from("f"), vec![Expression::Var(String::from("x"))]),
+                Expression::Call(
+                    Box::new(Expression::Var(String::from("f"))),
+                    vec![Expression::Var(String::from("x"))],
+                ),
             ))),
         );
         assert_eq!(environment.run(), Value::Float(-2.5));
