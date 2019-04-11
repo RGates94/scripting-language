@@ -30,7 +30,7 @@ pub enum Instruction {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
-    Call(String, Vec<String>),
+    Call(String, Vec<Expression>),
     Var(String),
     Lit(Value),
     Oper(Operator, Box<Expression>, Box<Expression>),
@@ -56,16 +56,10 @@ impl Function {
             ret_val,
         }
     }
-    pub fn call(&self, state: &ProgramState, args: &Vec<String>) -> Value {
+    pub fn call(&self, args: Vec<Value>) -> Value {
         let mut inner_state = ProgramState::new();
-        for (inner_arg, outer_arg) in self.arguments.iter().zip(args) {
-            inner_state.insert(
-                inner_arg.clone(),
-                state
-                    .get(outer_arg)
-                    .expect("Tried to call a nonexistent argument")
-                    .clone(),
-            )
+        for (name, value) in self.arguments.iter().zip(args) {
+            inner_state.insert(name.clone(), value)
         }
         for instruction in self.instructions.iter() {
             instruction.execute(&mut inner_state)
@@ -86,7 +80,9 @@ impl Expression {
     pub fn evaluate(&self, state: &ProgramState) -> Value {
         match self {
             Expression::Call(name, args) => match state.get(name).expect("Syntax Error") {
-                Value::Function(inner) => inner.call(state, args),
+                Value::Function(inner) => {
+                    inner.call(args.iter().map(|expr| expr.evaluate(state)).collect())
+                }
                 _ => panic!("Tried to call a non-function value"),
             },
             Expression::Var(id) => state.get(id).expect("Syntax Error").clone(),
@@ -203,7 +199,9 @@ mod tests {
             Expression::Var(String::from("y")),
         );
         assert_eq!(
-            function.call(&environment, &vec![String::from("x")]),
+            function.call(vec![
+                Expression::Var(String::from("x")).evaluate(&environment)
+            ]),
             Value::Float(-2.5)
         );
     }
@@ -231,19 +229,31 @@ mod tests {
             ),
         );
         assert_eq!(
-            adder.call(&environment, &vec![String::from("x"), String::from("x")]),
+            adder.call(vec![
+                Expression::Var(String::from("x")).evaluate(&environment),
+                Expression::Var(String::from("x")).evaluate(&environment)
+            ]),
             Value::Integer(-9)
         );
         assert_eq!(
-            adder.call(&environment, &vec![String::from("x"), String::from("y")]),
+            adder.call(vec![
+                Expression::Var(String::from("x")).evaluate(&environment),
+                Expression::Var(String::from("y")).evaluate(&environment)
+            ]),
             Value::Float(2.0)
         );
         assert_eq!(
-            adder.call(&environment, &vec![String::from("y"), String::from("x")]),
+            adder.call(vec![
+                Expression::Var(String::from("y")).evaluate(&environment),
+                Expression::Var(String::from("x")).evaluate(&environment)
+            ]),
             Value::Float(-3.5)
         );
         assert_eq!(
-            adder.call(&environment, &vec![String::from("y"), String::from("y")]),
+            adder.call(vec![
+                Expression::Var(String::from("y")).evaluate(&environment),
+                Expression::Var(String::from("y")).evaluate(&environment)
+            ]),
             Value::Float(7.5)
         );
     }
@@ -266,23 +276,38 @@ mod tests {
             ),
         );
         assert_eq!(
-            adder.call(&environment, &vec![String::from("h"), String::from("w")]),
+            adder.call(vec![
+                Expression::Var(String::from("h")).evaluate(&environment),
+                Expression::Var(String::from("w")).evaluate(&environment)
+            ]),
             Value::Text(String::from("Hello, World!"))
         );
         assert_eq!(
-            adder.call(&environment, &vec![String::from("h"), String::from("x")]),
+            adder.call(vec![
+                Expression::Var(String::from("h")).evaluate(&environment),
+                Expression::Var(String::from("x")).evaluate(&environment)
+            ]),
             Value::Text(String::from("Hello, -3"))
         );
         assert_eq!(
-            adder.call(&environment, &vec![String::from("h"), String::from("y")]),
+            adder.call(vec![
+                Expression::Var(String::from("h")).evaluate(&environment),
+                Expression::Var(String::from("y")).evaluate(&environment)
+            ]),
             Value::Text(String::from("Hello, 2.5"))
         );
         assert_eq!(
-            adder.call(&environment, &vec![String::from("x"), String::from("w")]),
+            adder.call(vec![
+                Expression::Var(String::from("x")).evaluate(&environment),
+                Expression::Var(String::from("w")).evaluate(&environment)
+            ]),
             Value::Text(String::from("-3World!"))
         );
         assert_eq!(
-            adder.call(&environment, &vec![String::from("y"), String::from("w")]),
+            adder.call(vec![
+                Expression::Var(String::from("y")).evaluate(&environment),
+                Expression::Var(String::from("w")).evaluate(&environment)
+            ]),
             Value::Text(String::from("2.5World!"))
         );
     }
