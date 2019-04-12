@@ -1,5 +1,65 @@
+use logos::Logos;
 use std::collections::HashMap;
 use std::ops::{Add, Mul, Sub};
+
+pub fn parse_script(script: &str) -> Vec<PreToken> {
+    let mut lexer = PreToken::lexer(script);
+    let mut tokens = vec![];
+
+    while !(PreToken::End == lexer.token || PreToken::Error == lexer.token) {
+        tokens.push(lexer.token);
+        lexer.advance()
+    }
+    tokens
+}
+
+#[derive(Logos, Debug, PartialEq, Copy, Clone)]
+pub enum PreToken {
+    #[token = "fn"]
+    Function,
+    #[token = "if"]
+    If,
+    #[token = "else"]
+    Else,
+    #[token = "for"]
+    For,
+    #[token = "while"]
+    While,
+    #[token = "end if"]
+    EndIf,
+    #[token = "end for"]
+    EndFor,
+    #[token = "end while"]
+    EndWhile,
+    #[token = "("]
+    StartParen,
+    #[token = ")"]
+    EndParen,
+    #[token = "=="]
+    Eq,
+    #[token = "!="]
+    Neq,
+    #[token = "="]
+    Assign,
+    #[token = "+"]
+    Add,
+    #[token = "-"]
+    Sub,
+    #[token = "*"]
+    Mul,
+    #[regex = "[0-9]+[.][0-9]+"]
+    Float,
+    #[regex = "[0-9]+"]
+    Integer,
+    #[token = "\n"]
+    NewLine,
+    #[regex = "[a-zA-Z][a-zA-Z0-9]*"]
+    Identifier,
+    #[end]
+    End,
+    #[error]
+    Error,
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Value {
@@ -589,4 +649,34 @@ mod tests {
         assert_eq!(environment.run(), Value::Integer(34));
     }
 
+    #[test]
+    fn pre_lexify() {
+        use PreToken::*;
+        let tokens = parse_script(
+            "\
+x = 7
+
+fn main()
+    y = 1
+    z = 1
+    while x != 0
+        x = x - 1
+        temp = y + z
+        y = z
+        z = temp
+    end while
+    y",
+        );
+        assert_eq!(
+            tokens,
+            vec![
+                Identifier, Assign, Integer, NewLine, NewLine, Function, Identifier, StartParen,
+                EndParen, NewLine, Identifier, Assign, Integer, NewLine, Identifier, Assign,
+                Integer, NewLine, While, Identifier, Neq, Integer, NewLine, Identifier, Assign,
+                Identifier, Sub, Integer, NewLine, Identifier, Assign, Identifier, Add, Identifier,
+                NewLine, Identifier, Assign, Identifier, NewLine, Identifier, Assign, Identifier,
+                NewLine, EndWhile, NewLine, Identifier
+            ]
+        )
+    }
 }
