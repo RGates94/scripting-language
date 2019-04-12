@@ -1,9 +1,13 @@
-use logos::Logos;
+use logos::{Lexer, Logos};
 use std::collections::HashMap;
 use std::ops::{Add, Mul, Sub};
 
 pub fn parse_script(script: &str) -> Vec<Token> {
     let mut lexer = PreToken::lexer(script);
+    pre_tokens_to_tokens(&mut lexer)
+}
+
+fn pre_tokens_to_tokens(lexer: &mut Lexer<PreToken, &str>) -> Vec<Token> {
     let mut tokens = vec![];
 
     loop {
@@ -20,10 +24,17 @@ pub fn parse_script(script: &str) -> Vec<Token> {
             PreToken::If => tokens.push(Token::If),
             PreToken::Else => tokens.push(Token::Else),
             PreToken::For => tokens.push(Token::For),
-            PreToken::While => tokens.push(Token::While),
+            PreToken::While => {
+                lexer.advance();
+                tokens.push(Token::While(pre_tokens_to_tokens(lexer)));
+                if let PreToken::EndWhile = lexer.token {
+                    lexer.advance()
+                } else {
+                    break;
+                }
+            }
             PreToken::EndIf => tokens.push(Token::EndIf),
             PreToken::EndFor => tokens.push(Token::EndFor),
-            PreToken::EndWhile => tokens.push(Token::EndWhile),
             PreToken::StartParen => tokens.push(Token::StartParen),
             PreToken::EndParen => tokens.push(Token::EndParen),
             PreToken::Eq => tokens.push(Token::Oper(Operator::Eq)),
@@ -46,7 +57,7 @@ pub fn parse_script(script: &str) -> Vec<Token> {
             ))),
             PreToken::NewLine => tokens.push(Token::NewLine),
             PreToken::Identifier => tokens.push(Token::Variable(String::from(lexer.slice()))),
-            PreToken::End | PreToken::Error => break,
+            _ => break,
         };
         lexer.advance();
     }
@@ -110,10 +121,9 @@ pub enum Token {
     If,
     Else,
     For,
-    While,
+    While(Vec<Token>),
     EndIf, //EndIf EndFor and EndWhile should go away with more robust handling
     EndFor,
-    EndWhile,
     StartParen,
     EndParen,
     Assign,
@@ -342,15 +352,7 @@ fn parse_expression(tokens: &[Token]) -> Option<(Expression, &[Token])> {
     }
 }
 
-fn parse_statement(tokens: &[Token]) -> Option<(Statement, &[Token])> {
-    let (first, tokens) = match tokens.split_first() {
-        Some((first, tokens)) => (first, tokens),
-        None => return None,
-    };
-    let name = match first {
-        Token::Variable(name) => name,
-        _ => return None,
-    };
+fn parse_assignment(name: String, tokens: &[Token]) -> Option<(Block, &[Token])> {
     let tokens = match tokens.split_first() {
         Some((Token::Assign, tokens)) => tokens,
         _ => return None,
@@ -359,7 +361,46 @@ fn parse_statement(tokens: &[Token]) -> Option<(Statement, &[Token])> {
         Some(result) => result,
         None => return None,
     };
-    Some((Statement::Assign(name.clone(), expr), tokens))
+    Some((
+        Block::Statement(Statement::Assign(name.clone(), expr)),
+        tokens,
+    ))
+}
+
+enum Block {
+    Statement(Statement),
+    Block(Vec<Statement>),
+}
+
+fn parse_while(tokens: &[Token], index: usize) -> Option<Block> {
+    let (expr, mut tokens) = match parse_expression(tokens) {
+        Some(result) => result,
+        None => return None,
+    };
+    let mut block = Vec::new();
+    while !tokens.is_empty() {
+        match parse_block(tokens, index + block.len()) {
+            Some((Block::Statement(state), remaining)) => {
+                block.push(state);
+                tokens = remaining;
+            }
+            Some((Block::Block(mut states), remaining)) => {
+                block.append(&mut states);
+                tokens = remaining;
+            }
+            None => return None,
+        }
+    }
+    block.push(Statement::Goto(index));
+    Some(Block::Block(block))
+}
+
+fn parse_block(tokens: &[Token], index: usize) -> Option<(Block, &[Token])> {
+    match tokens.split_first() {
+        Some((Token::Variable(name), tokens)) => parse_assignment(name.clone(), tokens),
+        Some((Token::While(inner), tokens)) => parse_while(inner, index).map(|x| (x,tokens)),
+        _ => return None,
+    }
 }
 
 fn parse_var<'a>(name: String, tokens: &'a [Token], state: &mut State) -> Option<&'a [Token]> {
@@ -401,8 +442,11 @@ fn parse_func<'a>(name: String, tokens: &'a [Token], state: &mut State) -> Optio
         tokens = remaining;
     }
     let mut statements = vec![];
-    while let Some((statement, remaining)) = parse_statement(tokens) {
-        statements.push(statement);
+    while let Some((block, remaining)) = parse_block(tokens, statements.len()) {
+        match block {
+            Block::Statement(statement) => statements.push(statement),
+            Block::Block(mut new_statements) => statements.append(&mut new_statements)
+        };
         tokens = remaining;
     }
     let (ret_val, tokens) = match parse_expression(tokens) {
@@ -843,15 +887,17 @@ x = 7
 fn main()
     y = 1
     z = 1
+    while x != 0
         x = x - 1
         temp = y + z
         y = z
         z = temp
+    end while
     y
 ",
         );
         // Commented out parts of test that have not been implemented yet
-        /*assert_eq!(
+        assert_eq!(
             tokens,
             vec![
                 Variable(String::from("x")),
@@ -871,37 +917,36 @@ fn main()
                 Assign,
                 Literal(Value::Integer(1)),
                 NewLine,
-                While,
-                Variable(String::from("x")),
-                Oper(Operator::Neq),
-                Literal(Value::Integer(0)),
-                NewLine,
-                Variable(String::from("x")),
-                Assign,
-                Variable(String::from("x")),
-                Oper(Operator::Subtract),
-                Literal(Value::Integer(1)),
-                NewLine,
-                Variable(String::from("temp")),
-                Assign,
-                Variable(String::from("y")),
-                Oper(Operator::Multiply),
-                Variable(String::from("z")),
-                NewLine,
-                Variable(String::from("y")),
-                Assign,
-                Variable(String::from("z")),
-                NewLine,
-                Variable(String::from("z")),
-                Assign,
-                Variable(String::from("temp")),
-                NewLine,
-                EndWhile,
-                NewLine,
+                While(vec![
+                    Variable(String::from("x")),
+                    Oper(Operator::Neq),
+                    Literal(Value::Integer(0)),
+                    NewLine,
+                    Variable(String::from("x")),
+                    Assign,
+                    Variable(String::from("x")),
+                    Oper(Operator::Subtract),
+                    Literal(Value::Integer(1)),
+                    NewLine,
+                    Variable(String::from("temp")),
+                    Assign,
+                    Variable(String::from("y")),
+                    Oper(Operator::Add),
+                    Variable(String::from("z")),
+                    NewLine,
+                    Variable(String::from("y")),
+                    Assign,
+                    Variable(String::from("z")),
+                    NewLine,
+                    Variable(String::from("z")),
+                    Assign,
+                    Variable(String::from("temp")),
+                    NewLine,
+                ]),
                 Variable(String::from("y")),
                 NewLine
             ]
-        );*/
+        );
         let env = State::from_tokens(&tokens);
         let mut environment = State::new();
         environment.insert(String::from("x"), Value::Integer(7));
@@ -939,7 +984,7 @@ fn main()
                     ),
                     Statement::Assign(String::from("y"), Expression::Var(String::from("z"))),
                     Statement::Assign(String::from("z"), Expression::Var(String::from("temp"))),
-                    //Statement::Goto(2),
+                    Statement::Goto(2),
                 ],
                 Expression::Var(String::from("y")),
             ))),
