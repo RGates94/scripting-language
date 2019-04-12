@@ -2,13 +2,53 @@ use logos::Logos;
 use std::collections::HashMap;
 use std::ops::{Add, Mul, Sub};
 
-pub fn parse_script(script: &str) -> Vec<PreToken> {
+pub fn parse_script(script: &str) -> Vec<Token> {
     let mut lexer = PreToken::lexer(script);
     let mut tokens = vec![];
 
-    while !(PreToken::End == lexer.token || PreToken::Error == lexer.token) {
-        tokens.push(lexer.token);
-        lexer.advance()
+    loop {
+        match lexer.token {
+            PreToken::Function => {
+                lexer.advance();
+                match lexer.token {
+                    PreToken::Identifier => {
+                        tokens.push(Token::Function(String::from(lexer.slice())))
+                    }
+                    _ => panic!("Expected Identifier"),
+                }
+            }
+            PreToken::If => tokens.push(Token::If),
+            PreToken::Else => tokens.push(Token::Else),
+            PreToken::For => tokens.push(Token::For),
+            PreToken::While => tokens.push(Token::While),
+            PreToken::EndIf => tokens.push(Token::EndIf),
+            PreToken::EndFor => tokens.push(Token::EndFor),
+            PreToken::EndWhile => tokens.push(Token::EndWhile),
+            PreToken::StartParen => tokens.push(Token::StartParen),
+            PreToken::EndParen => tokens.push(Token::EndParen),
+            PreToken::Eq => tokens.push(Token::Oper(Operator::Eq)),
+            PreToken::Neq => { /*This needs to be implemented first*/ }
+            PreToken::Assign => tokens.push(Token::Assign),
+            PreToken::Add => tokens.push(Token::Oper(Operator::Add)),
+            PreToken::Sub => tokens.push(Token::Oper(Operator::Subtract)),
+            PreToken::Mul => tokens.push(Token::Oper(Operator::Multiply)),
+            PreToken::Float => tokens.push(Token::Literal(Value::Float(
+                lexer
+                    .slice()
+                    .parse()
+                    .expect("Could not parse float from float token, internal error"),
+            ))),
+            PreToken::Integer => tokens.push(Token::Literal(Value::Integer(
+                lexer
+                    .slice()
+                    .parse()
+                    .expect("Could not parse integer from integer token, internal error"),
+            ))),
+            PreToken::NewLine => tokens.push(Token::NewLine),
+            PreToken::Identifier => tokens.push(Token::Variable(String::from(lexer.slice()))),
+            PreToken::End | PreToken::Error => break,
+        };
+        lexer.advance();
     }
     tokens
 }
@@ -59,6 +99,25 @@ pub enum PreToken {
     End,
     #[error]
     Error,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Token {
+    Literal(Value),
+    Variable(String),
+    Function(String),
+    Oper(Operator),
+    If,
+    Else,
+    For,
+    While,
+    EndIf, //EndIf EndFor and EndWhile should go away with more robust handling
+    EndFor,
+    EndWhile,
+    StartParen,
+    EndParen,
+    Assign,
+    NewLine,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -650,32 +709,73 @@ mod tests {
     }
 
     #[test]
-    fn pre_lexify() {
-        use PreToken::*;
+    fn tokenize() {
+        use Token::*;
         let tokens = parse_script(
             "\
-x = 7
+x = 7.5
 
 fn main()
     y = 1
     z = 1
-    while x != 0
+    while x == 0
         x = x - 1
-        temp = y + z
+        temp = y * z
         y = z
         z = temp
     end while
-    y",
+    y
+",
         );
         assert_eq!(
             tokens,
             vec![
-                Identifier, Assign, Integer, NewLine, NewLine, Function, Identifier, StartParen,
-                EndParen, NewLine, Identifier, Assign, Integer, NewLine, Identifier, Assign,
-                Integer, NewLine, While, Identifier, Neq, Integer, NewLine, Identifier, Assign,
-                Identifier, Sub, Integer, NewLine, Identifier, Assign, Identifier, Add, Identifier,
-                NewLine, Identifier, Assign, Identifier, NewLine, Identifier, Assign, Identifier,
-                NewLine, EndWhile, NewLine, Identifier
+                Variable(String::from("x")),
+                Assign,
+                Literal(Value::Float(7.5)),
+                NewLine,
+                NewLine,
+                Function(String::from("main")),
+                StartParen,
+                EndParen,
+                NewLine,
+                Variable(String::from("y")),
+                Assign,
+                Literal(Value::Integer(1)),
+                NewLine,
+                Variable(String::from("z")),
+                Assign,
+                Literal(Value::Integer(1)),
+                NewLine,
+                While,
+                Variable(String::from("x")),
+                Oper(Operator::Eq),
+                Literal(Value::Integer(0)),
+                NewLine,
+                Variable(String::from("x")),
+                Assign,
+                Variable(String::from("x")),
+                Oper(Operator::Subtract),
+                Literal(Value::Integer(1)),
+                NewLine,
+                Variable(String::from("temp")),
+                Assign,
+                Variable(String::from("y")),
+                Oper(Operator::Multiply),
+                Variable(String::from("z")),
+                NewLine,
+                Variable(String::from("y")),
+                Assign,
+                Variable(String::from("z")),
+                NewLine,
+                Variable(String::from("z")),
+                Assign,
+                Variable(String::from("temp")),
+                NewLine,
+                EndWhile,
+                NewLine,
+                Variable(String::from("y")),
+                NewLine
             ]
         )
     }
