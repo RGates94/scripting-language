@@ -27,7 +27,7 @@ pub fn parse_script(script: &str) -> Vec<Token> {
             PreToken::StartParen => tokens.push(Token::StartParen),
             PreToken::EndParen => tokens.push(Token::EndParen),
             PreToken::Eq => tokens.push(Token::Oper(Operator::Eq)),
-            PreToken::Neq => { /*This needs to be implemented first*/ }
+            PreToken::Neq => tokens.push(Token::Oper(Operator::Neq)),
             PreToken::Assign => tokens.push(Token::Assign),
             PreToken::Add => tokens.push(Token::Oper(Operator::Add)),
             PreToken::Sub => tokens.push(Token::Oper(Operator::Subtract)),
@@ -164,6 +164,7 @@ pub enum Operator {
     Multiply,
     Divide,
     Eq,
+    Neq,
 }
 
 impl Function {
@@ -239,6 +240,9 @@ impl Expression {
                 .expect("Failed to add"),
                 Operator::Eq => {
                     Value::Boolean(left.evaluate(state, globals) == right.evaluate(state, globals))
+                }
+                Operator::Neq => {
+                    Value::Boolean(left.evaluate(state, globals) != right.evaluate(state, globals))
                 }
                 _ => panic!("Not implemented"),
             },
@@ -673,12 +677,12 @@ mod tests {
                     Statement::Assign(String::from("z"), Expression::Lit(Value::Integer(1))),
                     Statement::ConditionalJump(
                         Expression::Oper(
-                            Operator::Eq,
+                            Operator::Neq,
                             Box::new(Expression::Var(String::from("x"))),
                             Box::new(Expression::Lit(Value::Integer(0))),
                         ),
-                        10,
                         3,
+                        10,
                     ),
                     Statement::Assign(
                         String::from("x"),
@@ -718,7 +722,7 @@ x = 7.5
 fn main()
     y = 1
     z = 1
-    while x == 0
+    while x != 0
         x = x - 1
         temp = y * z
         y = z
@@ -749,7 +753,7 @@ fn main()
                 NewLine,
                 While,
                 Variable(String::from("x")),
-                Oper(Operator::Eq),
+                Oper(Operator::Neq),
                 Literal(Value::Integer(0)),
                 NewLine,
                 Variable(String::from("x")),
