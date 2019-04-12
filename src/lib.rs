@@ -392,13 +392,19 @@ fn parse_while(tokens: &[Token], index: usize) -> Option<Block> {
         }
     }
     block.push(Statement::Goto(index));
-    Some(Block::Block(block))
+    let mut output = vec![Statement::ConditionalJump(
+        expr,
+        index + 1,
+        index + block.len() + 1,
+    )];
+    output.append(&mut block);
+    Some(Block::Block(output))
 }
 
 fn parse_block(tokens: &[Token], index: usize) -> Option<(Block, &[Token])> {
     match tokens.split_first() {
         Some((Token::Variable(name), tokens)) => parse_assignment(name.clone(), tokens),
-        Some((Token::While(inner), tokens)) => parse_while(inner, index).map(|x| (x,tokens)),
+        Some((Token::While(inner), tokens)) => parse_while(inner, index).map(|x| (x, tokens)),
         _ => return None,
     }
 }
@@ -445,7 +451,7 @@ fn parse_func<'a>(name: String, tokens: &'a [Token], state: &mut State) -> Optio
     while let Some((block, remaining)) = parse_block(tokens, statements.len()) {
         match block {
             Block::Statement(statement) => statements.push(statement),
-            Block::Block(mut new_statements) => statements.append(&mut new_statements)
+            Block::Block(mut new_statements) => statements.append(&mut new_statements),
         };
         tokens = remaining;
     }
@@ -847,7 +853,7 @@ mod tests {
                             Box::new(Expression::Lit(Value::Integer(0))),
                         ),
                         3,
-                        10,
+                        8,
                     ),
                     Statement::Assign(
                         String::from("x"),
@@ -957,15 +963,15 @@ fn main()
                 vec![
                     Statement::Assign(String::from("y"), Expression::Lit(Value::Integer(1))),
                     Statement::Assign(String::from("z"), Expression::Lit(Value::Integer(1))),
-                    /*Statement::ConditionalJump(
+                    Statement::ConditionalJump(
                         Expression::Oper(
                             Operator::Neq,
                             Box::new(Expression::Var(String::from("x"))),
                             Box::new(Expression::Lit(Value::Integer(0))),
                         ),
                         3,
-                        10,
-                    ),*/
+                        8,
+                    ),
                     Statement::Assign(
                         String::from("x"),
                         Expression::Oper(
