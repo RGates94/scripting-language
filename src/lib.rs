@@ -21,14 +21,12 @@ fn pre_tokens_to_tokens(lexer: &mut Lexer<PreToken, &str>) -> Vec<Token> {
             PreToken::While => {
                 lexer.advance();
                 tokens.push(Token::While(pre_tokens_to_tokens(lexer)));
-                if lexer.token == PreToken::EndWhile {
+                if lexer.token == PreToken::EndBlock {
                     lexer.advance()
                 } else {
                     break;
                 }
             }
-            PreToken::EndIf => tokens.push(Token::EndIf),
-            PreToken::EndFor => tokens.push(Token::EndFor),
             PreToken::StartParen => tokens.push(Token::StartParen),
             PreToken::EndParen => tokens.push(Token::EndParen),
             PreToken::Eq => tokens.push(Token::Oper(Operator::Eq)),
@@ -70,12 +68,8 @@ enum PreToken {
     For,
     #[token = "while"]
     While,
-    #[token = "end if"]
-    EndIf,
-    #[token = "end for"]
-    EndFor,
-    #[token = "end while"]
-    EndWhile,
+    #[token = "end"]
+    EndBlock,
     #[token = "("]
     StartParen,
     #[token = ")"]
@@ -945,7 +939,7 @@ fn main()
         temp = y + z
         y = z
         z = temp
-    end while
+    end
     y
 ",
         );
@@ -970,7 +964,7 @@ fn main()
         temp = y + z
         y = z
         z = temp
-    end while
+    end
     y
 ",
         ));
