@@ -59,7 +59,7 @@ fn pre_tokens_to_tokens(lexer: &mut Lexer<PreToken, &str>) -> Vec<Token> {
 }
 
 #[derive(Logos, Debug, PartialEq, Copy, Clone)]
-pub enum PreToken {
+enum PreToken {
     #[token = "fn"]
     Function,
     #[token = "if"]
@@ -107,7 +107,7 @@ pub enum PreToken {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Token {
+enum Token {
     Literal(Value),
     Variable(String),
     Function(String),
@@ -147,14 +147,14 @@ pub struct State {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Instruction {
+enum Instruction {
     Assign(String, Expression),
     Goto(usize),
     ConditionalJump(Expression, usize, usize),
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Expression {
+enum Expression {
     Call(Box<Expression>, Vec<Expression>),
     Var(String),
     Lit(Value),
@@ -162,7 +162,7 @@ pub enum Expression {
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
-pub enum Operator {
+enum Operator {
     Add,
     Subtract,
     Multiply,
@@ -172,7 +172,7 @@ pub enum Operator {
 }
 
 impl Function {
-    pub fn from(
+    fn from_raw(
         arguments: Vec<String>,
         instructions: Vec<Instruction>,
         ret_val: Expression,
@@ -458,7 +458,7 @@ fn parse_function<'a>(name: String, tokens: &'a [Token], state: &mut State) -> O
     };
     state.insert(
         name,
-        Value::Function(Box::new(Function::from(args, statements, ret_val))),
+        Value::Function(Box::new(Function::from_raw(args, statements, ret_val))),
     );
     Some(tokens)
 }
@@ -486,7 +486,7 @@ impl State {
         let mut lexer = PreToken::lexer(script);
         Self::from_tokens(&pre_tokens_to_tokens(&mut lexer))
     }
-    pub fn from_tokens(mut tokens: &[Token]) -> Self {
+    fn from_tokens(mut tokens: &[Token]) -> Self {
         let mut state = State::new();
         while let Some(remaining) = parse_value(tokens, &mut state) {
             tokens = remaining;
@@ -535,7 +535,7 @@ mod tests {
         environment.insert(String::from("x"), Value::Integer(-3));
         environment.insert(
             String::from("f"),
-            Value::Function(Box::new(Function::from(
+            Value::Function(Box::new(Function::from_raw(
                 vec![],
                 vec![Instruction::Assign(
                     String::from("x"),
@@ -566,7 +566,7 @@ mod tests {
         environment.insert(String::from("x"), Value::Float(-2.5));
         environment.insert(
             String::from("f"),
-            Value::Function(Box::new(Function::from(
+            Value::Function(Box::new(Function::from_raw(
                 vec![String::from("y")],
                 vec![],
                 Expression::Var(String::from("y")),
@@ -574,7 +574,7 @@ mod tests {
         );
         environment.insert(
             String::from("main"),
-            Value::Function(Box::new(Function::from(
+            Value::Function(Box::new(Function::from_raw(
                 vec![String::from("y")],
                 vec![],
                 Expression::Call(
@@ -592,7 +592,7 @@ mod tests {
 
         environment.insert(String::from("x"), Value::Integer(-3));
         environment.insert(String::from("y"), Value::Float(2.5));
-        let adder = Function::from(
+        let adder = Function::from_raw(
             vec![String::from("y"), String::from("x")],
             vec![Instruction::Assign(
                 String::from("z"),
@@ -658,7 +658,7 @@ mod tests {
         environment.insert(String::from("y"), Value::Float(2.5));
         environment.insert(String::from("h"), Value::Text(String::from("Hello, ")));
         environment.insert(String::from("w"), Value::Text(String::from("World!")));
-        let adder = Function::from(
+        let adder = Function::from_raw(
             vec![String::from("x"), String::from("y")],
             vec![],
             Expression::Oper(
@@ -727,7 +727,7 @@ mod tests {
         environment.insert(String::from("y"), Value::Float(2.5));
         environment.insert(String::from("x1"), Value::Integer(4));
         environment.insert(String::from("y1"), Value::Float(2.25));
-        let subber = Function::from(
+        let subber = Function::from_raw(
             vec![String::from("x"), String::from("y")],
             vec![],
             Expression::Oper(
@@ -785,7 +785,7 @@ mod tests {
         environment.insert(String::from("y"), Value::Float(2.5));
         environment.insert(String::from("x1"), Value::Integer(-4));
         environment.insert(String::from("y1"), Value::Float(2.25));
-        let multer = Function::from(
+        let multer = Function::from_raw(
             vec![String::from("x"), String::from("y")],
             vec![],
             Expression::Oper(
@@ -842,7 +842,7 @@ mod tests {
         by_hand.insert(String::from("x"), Value::Integer(7));
         by_hand.insert(
             String::from("main"),
-            Value::Function(Box::new(Function::from(
+            Value::Function(Box::new(Function::from_raw(
                 vec![],
                 vec![
                     Instruction::Assign(String::from("y"), Expression::Lit(Value::Integer(1))),
@@ -887,7 +887,7 @@ mod tests {
         by_hand.insert(String::from("x"), Value::Integer(7));
         by_hand.insert(
             String::from("main"),
-            Value::Function(Box::new(Function::from(
+            Value::Function(Box::new(Function::from_raw(
                 vec![],
                 vec![
                     Instruction::Assign(String::from("y"), Expression::Lit(Value::Integer(1))),
