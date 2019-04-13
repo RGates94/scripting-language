@@ -2,11 +2,6 @@ use logos::{Lexer, Logos};
 use std::collections::HashMap;
 use std::ops::{Add, Mul, Sub};
 
-pub fn parse_script(script: &str) -> Vec<Token> {
-    let mut lexer = PreToken::lexer(script);
-    pre_tokens_to_tokens(&mut lexer)
-}
-
 fn pre_tokens_to_tokens(lexer: &mut Lexer<PreToken, &str>) -> Vec<Token> {
     let mut tokens = vec![];
 
@@ -190,9 +185,10 @@ impl Function {
     }
     pub fn call(&self, args: Vec<Value>, globals: &State) -> Value {
         let mut inner_state = State::new();
-        for (name, value) in self.arguments.iter().zip(args) {
-            inner_state.insert(name.clone(), value)
-        }
+        self.arguments
+            .iter()
+            .zip(args)
+            .for_each(|(name, value)| inner_state.insert(name.clone(), value));
         let mut current_instruction = 0;
         while let Some(instruction) = self.instructions.get(current_instruction) {
             if let Some(line) = instruction.execute(&mut inner_state, globals) {
@@ -485,6 +481,10 @@ impl State {
         State {
             variables: HashMap::new(),
         }
+    }
+    pub fn from_str(script: &str) -> Self {
+        let mut lexer = PreToken::lexer(script);
+        Self::from_tokens(&pre_tokens_to_tokens(&mut lexer))
     }
     pub fn from_tokens(mut tokens: &[Token]) -> Self {
         let mut state = State::new();
@@ -837,10 +837,10 @@ mod tests {
     }
 
     #[test]
-    fn fibonacci() {
-        let mut environment = State::new();
-        environment.insert(String::from("x"), Value::Integer(7));
-        environment.insert(
+    fn fibonacci_manual() {
+        let mut by_hand = State::new();
+        by_hand.insert(String::from("x"), Value::Integer(7));
+        by_hand.insert(
             String::from("main"),
             Value::Function(Box::new(Function::from(
                 vec![],
@@ -879,15 +879,52 @@ mod tests {
                 Expression::Var(String::from("y")),
             ))),
         );
-        assert_eq!(environment.run(), Value::Integer(21));
-        environment.insert(String::from("x"), Value::Integer(8));
-        assert_eq!(environment.run(), Value::Integer(34));
     }
 
     #[test]
-    fn tokenize() {
-        use Token::*;
-        let tokens = parse_script(
+    fn fibonacci() {
+        let mut by_hand = State::new();
+        by_hand.insert(String::from("x"), Value::Integer(7));
+        by_hand.insert(
+            String::from("main"),
+            Value::Function(Box::new(Function::from(
+                vec![],
+                vec![
+                    Instruction::Assign(String::from("y"), Expression::Lit(Value::Integer(1))),
+                    Instruction::Assign(String::from("z"), Expression::Lit(Value::Integer(1))),
+                    Instruction::ConditionalJump(
+                        Expression::Oper(
+                            Operator::Neq,
+                            Box::new(Expression::Var(String::from("x"))),
+                            Box::new(Expression::Lit(Value::Integer(0))),
+                        ),
+                        3,
+                        8,
+                    ),
+                    Instruction::Assign(
+                        String::from("x"),
+                        Expression::Oper(
+                            Operator::Subtract,
+                            Box::new(Expression::Var(String::from("x"))),
+                            Box::new(Expression::Lit(Value::Integer(1))),
+                        ),
+                    ),
+                    Instruction::Assign(
+                        String::from("temp"),
+                        Expression::Oper(
+                            Operator::Add,
+                            Box::new(Expression::Var(String::from("y"))),
+                            Box::new(Expression::Var(String::from("z"))),
+                        ),
+                    ),
+                    Instruction::Assign(String::from("y"), Expression::Var(String::from("z"))),
+                    Instruction::Assign(String::from("z"), Expression::Var(String::from("temp"))),
+                    Instruction::Goto(2),
+                ],
+                Expression::Var(String::from("y")),
+            ))),
+        );
+        let mut program = State::from_str(
             "\
 x = 7
 
@@ -903,6 +940,31 @@ fn main()
     y
 ",
         );
+        assert_eq!(program, by_hand);
+        assert_eq!(program.run(), Value::Integer(21));
+        program.insert(String::from("x"), Value::Integer(8));
+        assert_eq!(program.run(), Value::Integer(34));
+    }
+
+    #[test]
+    fn tokenize() {
+        use Token::*;
+        let tokens = pre_tokens_to_tokens(&mut PreToken::lexer(
+            "\
+x = 7
+
+fn main()
+    y = 1
+    z = 1
+    while x != 0
+        x = x - 1
+        temp = y + z
+        y = z
+        z = temp
+    end while
+    y
+",
+        ));
         assert_eq!(
             tokens,
             vec![
@@ -953,48 +1015,5 @@ fn main()
                 NewLine
             ]
         );
-        let env = State::from_tokens(&tokens);
-        let mut environment = State::new();
-        environment.insert(String::from("x"), Value::Integer(7));
-        environment.insert(
-            String::from("main"),
-            Value::Function(Box::new(super::Function::from(
-                vec![],
-                vec![
-                    Instruction::Assign(String::from("y"), Expression::Lit(Value::Integer(1))),
-                    Instruction::Assign(String::from("z"), Expression::Lit(Value::Integer(1))),
-                    Instruction::ConditionalJump(
-                        Expression::Oper(
-                            Operator::Neq,
-                            Box::new(Expression::Var(String::from("x"))),
-                            Box::new(Expression::Lit(Value::Integer(0))),
-                        ),
-                        3,
-                        8,
-                    ),
-                    Instruction::Assign(
-                        String::from("x"),
-                        Expression::Oper(
-                            Operator::Subtract,
-                            Box::new(Expression::Var(String::from("x"))),
-                            Box::new(Expression::Lit(Value::Integer(1))),
-                        ),
-                    ),
-                    Instruction::Assign(
-                        String::from("temp"),
-                        Expression::Oper(
-                            Operator::Add,
-                            Box::new(Expression::Var(String::from("y"))),
-                            Box::new(Expression::Var(String::from("z"))),
-                        ),
-                    ),
-                    Instruction::Assign(String::from("y"), Expression::Var(String::from("z"))),
-                    Instruction::Assign(String::from("z"), Expression::Var(String::from("temp"))),
-                    Instruction::Goto(2),
-                ],
-                Expression::Var(String::from("y")),
-            ))),
-        );
-        assert_eq!(env, environment)
     }
 }
