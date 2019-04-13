@@ -499,12 +499,11 @@ impl State {
     pub fn get(&self, key: &str) -> Option<&Value> {
         self.variables.get(key)
     }
-    pub fn run(&self) -> Value {
-        match self.variables.get("main") {
-            Some(Value::Function(main)) => main.call(vec![], &self),
-            Some(val) => val.clone(),
-            None => panic!("No main found"),
-        }
+    pub fn run(&self, entry_point: &str) -> Option<Value> {
+        self.variables.get(entry_point).map(|val| match val {
+            Value::Function(main) => main.call(vec![], &self),
+            val => val.clone(),
+        })
     }
 }
 
@@ -583,7 +582,7 @@ mod tests {
                 ),
             ))),
         );
-        assert_eq!(environment.run(), Value::Float(-2.5));
+        assert_eq!(environment.run("main"), Some(Value::Float(-2.5)));
     }
 
     #[test]
@@ -941,9 +940,9 @@ fn main()
 ",
         );
         assert_eq!(program, by_hand);
-        assert_eq!(program.run(), Value::Integer(21));
+        assert_eq!(program.run("main"), Some(Value::Integer(21)));
         program.insert(String::from("x"), Value::Integer(8));
-        assert_eq!(program.run(), Value::Integer(34));
+        assert_eq!(program.run("main"), Some(Value::Integer(34)));
     }
 
     #[test]
