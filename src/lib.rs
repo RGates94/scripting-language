@@ -14,11 +14,10 @@ fn pre_tokens_to_tokens(lexer: &mut Lexer<PreToken, &str>) -> Vec<Token> {
         match lexer.token {
             PreToken::Function => {
                 lexer.advance();
-                match lexer.token {
-                    PreToken::Identifier => {
-                        tokens.push(Token::Function(String::from(lexer.slice())))
-                    }
-                    _ => panic!("Expected Identifier"),
+                if lexer.token == PreToken::Identifier {
+                    tokens.push(Token::Function(String::from(lexer.slice())))
+                } else {
+                    panic!("Expected Identifier")
                 }
             }
             PreToken::If => tokens.push(Token::If),
@@ -27,7 +26,7 @@ fn pre_tokens_to_tokens(lexer: &mut Lexer<PreToken, &str>) -> Vec<Token> {
             PreToken::While => {
                 lexer.advance();
                 tokens.push(Token::While(pre_tokens_to_tokens(lexer)));
-                if let PreToken::EndWhile = lexer.token {
+                if lexer.token == PreToken::EndWhile {
                     lexer.advance()
                 } else {
                     break;
@@ -122,7 +121,7 @@ pub enum Token {
     Else,
     For,
     While(Vec<Token>),
-    EndIf, //EndIf EndFor and EndWhile should go away with more robust handling
+    EndIf, //EndIf and EndFor should go away with more robust handling
     EndFor,
     StartParen,
     EndParen,
@@ -143,7 +142,7 @@ pub enum Value {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Function {
     arguments: Vec<String>,
-    instructions: Vec<Statement>,
+    instructions: Vec<Instruction>,
     ret_val: Expression,
 }
 
@@ -153,7 +152,7 @@ pub struct State {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Statement {
+pub enum Instruction {
     Assign(String, Expression),
     Goto(usize),
     ConditionalJump(Expression, usize, usize),
@@ -178,7 +177,11 @@ pub enum Operator {
 }
 
 impl Function {
-    pub fn from(arguments: Vec<String>, instructions: Vec<Statement>, ret_val: Expression) -> Self {
+    pub fn from(
+        arguments: Vec<String>,
+        instructions: Vec<Instruction>,
+        ret_val: Expression,
+    ) -> Self {
         Function {
             arguments,
             instructions,
@@ -202,15 +205,15 @@ impl Function {
     }
 }
 
-impl Statement {
+impl Instruction {
     pub fn execute(&self, state: &mut State, globals: &State) -> Option<usize> {
         match self {
-            Statement::Assign(name, expr) => {
+            Instruction::Assign(name, expr) => {
                 state.insert(name.to_string(), expr.evaluate(state, globals));
                 None
             }
-            Statement::Goto(line) => Some(*line),
-            Statement::ConditionalJump(condition, if_true, otherwise) => {
+            Instruction::Goto(line) => Some(*line),
+            Instruction::ConditionalJump(condition, if_true, otherwise) => {
                 if condition.evaluate(state, globals) == Value::Boolean(true) {
                     Some(*if_true)
                 } else {
@@ -330,11 +333,6 @@ fn parse_expression(tokens: &[Token]) -> Option<(Expression, &[Token])> {
         Some((first, tokens)) => (first, tokens),
         None => return None,
     };
-    let expr = match first {
-        Token::Literal(value) => Expression::Lit(value.clone()),
-        Token::Variable(name) => Expression::Var(name.clone()),
-        _ => return None,
-    };
     let (second, tokens) = match tokens.split_first() {
         Some((first, tokens)) => (first, tokens),
         None => return Some((expr, tokens)),
@@ -352,24 +350,22 @@ fn parse_expression(tokens: &[Token]) -> Option<(Expression, &[Token])> {
     }
 }
 
+enum Block {
+    Statement(Instruction),
+    Block(Vec<Instruction>),
+}
+
 fn parse_assignment(name: String, tokens: &[Token]) -> Option<(Block, &[Token])> {
-    let tokens = match tokens.split_first() {
-        Some((Token::Assign, tokens)) => tokens,
-        _ => return None,
+    let tokens = if let Some((Token::Assign, tokens)) = tokens.split_first() {
+        tokens
+    } else {
+        return None;
     };
     let (expr, tokens) = match parse_expression(tokens) {
         Some(result) => result,
         None => return None,
     };
-    Some((
-        Block::Statement(Statement::Assign(name.clone(), expr)),
-        tokens,
-    ))
-}
-
-enum Block {
-    Statement(Statement),
-    Block(Vec<Statement>),
+    Some((Block::Statement(Instruction::Assign(name, expr)), tokens))
 }
 
 fn parse_while(tokens: &[Token], index: usize) -> Option<Block> {
@@ -391,8 +387,8 @@ fn parse_while(tokens: &[Token], index: usize) -> Option<Block> {
             None => return None,
         }
     }
-    block.push(Statement::Goto(index));
-    let mut output = vec![Statement::ConditionalJump(
+    block.push(Instruction::Goto(index));
+    let mut output = vec![Instruction::ConditionalJump(
         expr,
         index + 1,
         index + block.len() + 1,
@@ -425,7 +421,7 @@ fn parse_var<'a>(name: String, tokens: &'a [Token], state: &mut State) -> Option
     Some(tokens)
 }
 
-fn parse_func<'a>(name: String, tokens: &'a [Token], state: &mut State) -> Option<&'a [Token]> {
+fn parse_function<'a>(name: String, tokens: &'a [Token], state: &mut State) -> Option<&'a [Token]> {
     let mut tokens = match tokens.split_first() {
         Some((Token::StartParen, tokens)) => tokens,
         _ => return None,
@@ -473,7 +469,7 @@ fn parse_value<'a>(tokens: &'a [Token], state: &mut State) -> Option<&'a [Token]
     };
     match first {
         Token::Variable(name) => parse_var(name.clone(), tokens, state),
-        Token::Function(name) => parse_func(name.clone(), tokens, state),
+        Token::Function(name) => parse_function(name.clone(), tokens, state),
         Token::NewLine => Some(tokens),
         _ => None,
     }
@@ -522,7 +518,7 @@ mod tests {
     #[test]
     fn execute_instruction() {
         let mut environment = State::new();
-        Statement::Assign(String::from("x"), Expression::Lit(Value::Float(4.0)))
+        Instruction::Assign(String::from("x"), Expression::Lit(Value::Float(4.0)))
             .execute(&mut environment, &State::new());
         assert_eq!(environment.get("x"), Some(&Value::Float(4.0)));
         assert_eq!(environment.get("y"), None);
@@ -536,7 +532,7 @@ mod tests {
             String::from("f"),
             Value::Function(Box::new(Function::from(
                 vec![],
-                vec![Statement::Assign(
+                vec![Instruction::Assign(
                     String::from("x"),
                     Expression::Lit(Value::Text(String::from("Hi!"))),
                 )],
@@ -593,7 +589,7 @@ mod tests {
         environment.insert(String::from("y"), Value::Float(2.5));
         let adder = Function::from(
             vec![String::from("y"), String::from("x")],
-            vec![Statement::Assign(
+            vec![Instruction::Assign(
                 String::from("z"),
                 Expression::Oper(
                     Operator::Add,
@@ -844,9 +840,9 @@ mod tests {
             Value::Function(Box::new(Function::from(
                 vec![],
                 vec![
-                    Statement::Assign(String::from("y"), Expression::Lit(Value::Integer(1))),
-                    Statement::Assign(String::from("z"), Expression::Lit(Value::Integer(1))),
-                    Statement::ConditionalJump(
+                    Instruction::Assign(String::from("y"), Expression::Lit(Value::Integer(1))),
+                    Instruction::Assign(String::from("z"), Expression::Lit(Value::Integer(1))),
+                    Instruction::ConditionalJump(
                         Expression::Oper(
                             Operator::Neq,
                             Box::new(Expression::Var(String::from("x"))),
@@ -855,7 +851,7 @@ mod tests {
                         3,
                         8,
                     ),
-                    Statement::Assign(
+                    Instruction::Assign(
                         String::from("x"),
                         Expression::Oper(
                             Operator::Subtract,
@@ -863,7 +859,7 @@ mod tests {
                             Box::new(Expression::Lit(Value::Integer(1))),
                         ),
                     ),
-                    Statement::Assign(
+                    Instruction::Assign(
                         String::from("temp"),
                         Expression::Oper(
                             Operator::Add,
@@ -871,9 +867,9 @@ mod tests {
                             Box::new(Expression::Var(String::from("z"))),
                         ),
                     ),
-                    Statement::Assign(String::from("y"), Expression::Var(String::from("z"))),
-                    Statement::Assign(String::from("z"), Expression::Var(String::from("temp"))),
-                    Statement::Goto(2),
+                    Instruction::Assign(String::from("y"), Expression::Var(String::from("z"))),
+                    Instruction::Assign(String::from("z"), Expression::Var(String::from("temp"))),
+                    Instruction::Goto(2),
                 ],
                 Expression::Var(String::from("y")),
             ))),
@@ -902,7 +898,6 @@ fn main()
     y
 ",
         );
-        // Commented out parts of test that have not been implemented yet
         assert_eq!(
             tokens,
             vec![
@@ -961,9 +956,9 @@ fn main()
             Value::Function(Box::new(super::Function::from(
                 vec![],
                 vec![
-                    Statement::Assign(String::from("y"), Expression::Lit(Value::Integer(1))),
-                    Statement::Assign(String::from("z"), Expression::Lit(Value::Integer(1))),
-                    Statement::ConditionalJump(
+                    Instruction::Assign(String::from("y"), Expression::Lit(Value::Integer(1))),
+                    Instruction::Assign(String::from("z"), Expression::Lit(Value::Integer(1))),
+                    Instruction::ConditionalJump(
                         Expression::Oper(
                             Operator::Neq,
                             Box::new(Expression::Var(String::from("x"))),
@@ -972,7 +967,7 @@ fn main()
                         3,
                         8,
                     ),
-                    Statement::Assign(
+                    Instruction::Assign(
                         String::from("x"),
                         Expression::Oper(
                             Operator::Subtract,
@@ -980,7 +975,7 @@ fn main()
                             Box::new(Expression::Lit(Value::Integer(1))),
                         ),
                     ),
-                    Statement::Assign(
+                    Instruction::Assign(
                         String::from("temp"),
                         Expression::Oper(
                             Operator::Add,
@@ -988,9 +983,9 @@ fn main()
                             Box::new(Expression::Var(String::from("z"))),
                         ),
                     ),
-                    Statement::Assign(String::from("y"), Expression::Var(String::from("z"))),
-                    Statement::Assign(String::from("z"), Expression::Var(String::from("temp"))),
-                    Statement::Goto(2),
+                    Instruction::Assign(String::from("y"), Expression::Var(String::from("z"))),
+                    Instruction::Assign(String::from("z"), Expression::Var(String::from("temp"))),
+                    Instruction::Goto(2),
                 ],
                 Expression::Var(String::from("y")),
             ))),
