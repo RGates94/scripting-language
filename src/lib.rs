@@ -124,6 +124,7 @@ enum Token {
     NewLine,
 }
 
+/// Representation of any value in the scripting language, each variant is a data type.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Value {
     Integer(i64),
@@ -134,6 +135,7 @@ pub enum Value {
     Function(Box<Function>),
 }
 
+///A scripting language function
 #[derive(Debug, PartialEq, Clone)]
 pub struct Function {
     arguments: Vec<String>,
@@ -141,6 +143,7 @@ pub struct Function {
     ret_val: Expression,
 }
 
+///Represents a scripting language program
 #[derive(Debug, PartialEq, Clone)]
 pub struct State {
     variables: HashMap<String, Value>,
@@ -183,6 +186,7 @@ impl Function {
             ret_val,
         }
     }
+    /// Calls self with specified args and specified global state
     pub fn call(&self, args: Vec<Value>, globals: &State) -> Value {
         let mut inner_state = State::new();
         self.arguments
@@ -477,15 +481,18 @@ fn parse_value<'a>(tokens: &'a [Token], state: &mut State) -> Option<&'a [Token]
 }
 
 impl State {
+    /// Creates a new State containing no data.
     pub fn new() -> Self {
         State {
             variables: HashMap::new(),
         }
     }
+    /// Parses given string as a script, and returns the corresponding script
     pub fn from_str(script: &str) -> Self {
         let mut lexer = PreToken::lexer(script);
         Self::from_tokens(&pre_tokens_to_tokens(&mut lexer))
     }
+    // This constructs the State from the
     fn from_tokens(mut tokens: &[Token]) -> Self {
         let mut state = State::new();
         while let Some(remaining) = parse_value(tokens, &mut state) {
@@ -493,12 +500,15 @@ impl State {
         }
         state
     }
+    ///Inserts a value into the State with specified key.
     pub fn insert(&mut self, key: String, value: Value) {
         self.variables.insert(key, value);
     }
+    ///Returns the corresponding value if key is in the State, and None otherwise
     pub fn get(&self, key: &str) -> Option<&Value> {
         self.variables.get(key)
     }
+    ///Returns the result of calling entry_point if it is found in the State, and None otherwise
     pub fn run(&self, entry_point: &str) -> Option<Value> {
         self.variables.get(entry_point).map(|val| match val {
             Value::Function(main) => main.call(vec![], &self),
