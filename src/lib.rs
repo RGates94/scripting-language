@@ -18,15 +18,8 @@ fn pre_tokens_to_tokens(lexer: &mut Lexer<PreToken, &str>) -> Vec<Token> {
             PreToken::If => tokens.push(Token::If),
             PreToken::Else => tokens.push(Token::Else),
             PreToken::For => tokens.push(Token::For),
-            PreToken::While => {
-                lexer.advance();
-                tokens.push(Token::While(pre_tokens_to_tokens(lexer)));
-                if lexer.token == PreToken::EndBlock {
-                    lexer.advance()
-                } else {
-                    break;
-                }
-            }
+            PreToken::While => tokens.push(Token::While),
+            PreToken::EndBlock => tokens.push(Token::EndBlock),
             PreToken::StartParen => tokens.push(Token::StartParen),
             PreToken::EndParen => tokens.push(Token::EndParen),
             PreToken::Eq => tokens.push(Token::Eq),
@@ -113,9 +106,8 @@ enum Token {
     If,
     Else,
     For,
-    While(Vec<Token>),
-    EndIf, //EndIf and EndFor should go away with more robust handling
-    EndFor,
+    While,
+    EndBlock,
     StartParen,
     EndParen,
     Assign,
@@ -348,35 +340,35 @@ fn parse_expression(tokens: &[Token]) -> Option<(Expression, &[Token])> {
                 tokens,
             )),
             _ => None,
-        }
+        },
         Token::Subtract => match parse_expression(tokens) {
             Some((right, tokens)) => Some((
                 Expression::Oper(Operator::Subtract, Box::new(expr), Box::new(right)),
                 tokens,
             )),
             _ => None,
-        }
+        },
         Token::Multiply => match parse_expression(tokens) {
             Some((right, tokens)) => Some((
                 Expression::Oper(Operator::Multiply, Box::new(expr), Box::new(right)),
                 tokens,
             )),
             _ => None,
-        }
+        },
         Token::Eq => match parse_expression(tokens) {
             Some((right, tokens)) => Some((
                 Expression::Oper(Operator::Eq, Box::new(expr), Box::new(right)),
                 tokens,
             )),
             _ => None,
-        }
+        },
         Token::Neq => match parse_expression(tokens) {
             Some((right, tokens)) => Some((
                 Expression::Oper(Operator::Neq, Box::new(expr), Box::new(right)),
                 tokens,
             )),
             _ => None,
-        }
+        },
         _ => None,
     }
 }
@@ -399,13 +391,17 @@ fn parse_assignment(name: String, tokens: &[Token]) -> Option<(Block, &[Token])>
     Some((Block::Statement(Instruction::Assign(name, expr)), tokens))
 }
 
-fn parse_while(tokens: &[Token], index: usize) -> Option<Block> {
+fn parse_while(tokens: &[Token], index: usize) -> Option<(Block,&[Token])> {
     let (expr, mut tokens) = match parse_expression(tokens) {
         Some(result) => result,
         None => return None,
     };
     let mut block = Vec::new();
     while !tokens.is_empty() {
+        if tokens.first() == Some(&Token::EndBlock) {
+            tokens = &tokens[2..];
+            break;
+        };
         match parse_block(tokens, index + block.len()) {
             Some((Block::Statement(state), remaining)) => {
                 block.push(state);
@@ -425,13 +421,14 @@ fn parse_while(tokens: &[Token], index: usize) -> Option<Block> {
         index + block.len() + 1,
     )];
     output.append(&mut block);
-    Some(Block::Block(output))
+    Some((Block::Block(output),tokens))
 }
 
 fn parse_block(tokens: &[Token], index: usize) -> Option<(Block, &[Token])> {
     match tokens.split_first() {
         Some((Token::Variable(name), tokens)) => parse_assignment(name.clone(), tokens),
-        Some((Token::While(inner), tokens)) => parse_while(inner, index).map(|x| (x, tokens)),
+        Some((Token::While, tokens)) => parse_while(tokens, index),
+        Some((Token::NewLine, tokens)) => parse_block(tokens, index),
         _ => return None,
     }
 }
@@ -1020,32 +1017,33 @@ fn main()
                 Assign,
                 Literal(Value::Integer(1)),
                 NewLine,
-                While(vec![
-                    Variable(String::from("x")),
-                    Neq,
-                    Literal(Value::Integer(0)),
-                    NewLine,
-                    Variable(String::from("x")),
-                    Assign,
-                    Variable(String::from("x")),
-                    Subtract,
-                    Literal(Value::Integer(1)),
-                    NewLine,
-                    Variable(String::from("temp")),
-                    Assign,
-                    Variable(String::from("y")),
-                    Add,
-                    Variable(String::from("z")),
-                    NewLine,
-                    Variable(String::from("y")),
-                    Assign,
-                    Variable(String::from("z")),
-                    NewLine,
-                    Variable(String::from("z")),
-                    Assign,
-                    Variable(String::from("temp")),
-                    NewLine,
-                ]),
+                While,
+                Variable(String::from("x")),
+                Neq,
+                Literal(Value::Integer(0)),
+                NewLine,
+                Variable(String::from("x")),
+                Assign,
+                Variable(String::from("x")),
+                Subtract,
+                Literal(Value::Integer(1)),
+                NewLine,
+                Variable(String::from("temp")),
+                Assign,
+                Variable(String::from("y")),
+                Add,
+                Variable(String::from("z")),
+                NewLine,
+                Variable(String::from("y")),
+                Assign,
+                Variable(String::from("z")),
+                NewLine,
+                Variable(String::from("z")),
+                Assign,
+                Variable(String::from("temp")),
+                NewLine,
+                EndBlock,
+                NewLine,
                 Variable(String::from("y")),
                 NewLine
             ]
