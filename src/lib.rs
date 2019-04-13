@@ -391,7 +391,7 @@ fn parse_assignment(name: String, tokens: &[Token]) -> Option<(Block, &[Token])>
     Some((Block::Statement(Instruction::Assign(name, expr)), tokens))
 }
 
-fn parse_while(tokens: &[Token], index: usize) -> Option<(Block,&[Token])> {
+fn parse_while(tokens: &[Token], index: usize) -> Option<(Block, &[Token])> {
     let (expr, mut tokens) = match parse_expression(tokens) {
         Some(result) => result,
         None => return None,
@@ -421,7 +421,7 @@ fn parse_while(tokens: &[Token], index: usize) -> Option<(Block,&[Token])> {
         index + block.len() + 1,
     )];
     output.append(&mut block);
-    Some((Block::Block(output),tokens))
+    Some((Block::Block(output), tokens))
 }
 
 fn parse_block(tokens: &[Token], index: usize) -> Option<(Block, &[Token])> {
