@@ -333,6 +333,11 @@ fn parse_expression(tokens: &[Token]) -> Option<(Expression, &[Token])> {
         Some((first, tokens)) => (first, tokens),
         None => return None,
     };
+    let expr = match first {
+        Token::Literal(value) => Expression::Lit(value.clone()),
+        Token::Variable(name) => Expression::Var(name.clone()),
+        _ => return None,
+    };
     let (second, tokens) = match tokens.split_first() {
         Some((first, tokens)) => (first, tokens),
         None => return Some((expr, tokens)),
