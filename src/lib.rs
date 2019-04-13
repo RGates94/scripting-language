@@ -29,12 +29,12 @@ fn pre_tokens_to_tokens(lexer: &mut Lexer<PreToken, &str>) -> Vec<Token> {
             }
             PreToken::StartParen => tokens.push(Token::StartParen),
             PreToken::EndParen => tokens.push(Token::EndParen),
-            PreToken::Eq => tokens.push(Token::Oper(Operator::Eq)),
-            PreToken::Neq => tokens.push(Token::Oper(Operator::Neq)),
+            PreToken::Eq => tokens.push(Token::Eq),
+            PreToken::Neq => tokens.push(Token::Neq),
             PreToken::Assign => tokens.push(Token::Assign),
-            PreToken::Add => tokens.push(Token::Oper(Operator::Add)),
-            PreToken::Sub => tokens.push(Token::Oper(Operator::Subtract)),
-            PreToken::Mul => tokens.push(Token::Oper(Operator::Multiply)),
+            PreToken::Add => tokens.push(Token::Add),
+            PreToken::Subtract => tokens.push(Token::Subtract),
+            PreToken::Mul => tokens.push(Token::Multiply),
             PreToken::Float => tokens.push(Token::Literal(Value::Float(
                 lexer
                     .slice()
@@ -83,7 +83,7 @@ enum PreToken {
     #[token = "+"]
     Add,
     #[token = "-"]
-    Sub,
+    Subtract,
     #[token = "*"]
     Mul,
     #[regex = "[0-9]+[.][0-9]+"]
@@ -105,7 +105,11 @@ enum Token {
     Literal(Value),
     Variable(String),
     Function(String),
-    Oper(Operator),
+    Add,
+    Subtract,
+    Multiply,
+    Eq,
+    Neq,
     If,
     Else,
     For,
@@ -338,13 +342,41 @@ fn parse_expression(tokens: &[Token]) -> Option<(Expression, &[Token])> {
     };
     match second {
         Token::NewLine => Some((expr, tokens)),
-        Token::Oper(op) => match parse_expression(tokens) {
+        Token::Add => match parse_expression(tokens) {
             Some((right, tokens)) => Some((
-                Expression::Oper(*op, Box::new(expr), Box::new(right)),
+                Expression::Oper(Operator::Add, Box::new(expr), Box::new(right)),
                 tokens,
             )),
             _ => None,
-        },
+        }
+        Token::Subtract => match parse_expression(tokens) {
+            Some((right, tokens)) => Some((
+                Expression::Oper(Operator::Subtract, Box::new(expr), Box::new(right)),
+                tokens,
+            )),
+            _ => None,
+        }
+        Token::Multiply => match parse_expression(tokens) {
+            Some((right, tokens)) => Some((
+                Expression::Oper(Operator::Multiply, Box::new(expr), Box::new(right)),
+                tokens,
+            )),
+            _ => None,
+        }
+        Token::Eq => match parse_expression(tokens) {
+            Some((right, tokens)) => Some((
+                Expression::Oper(Operator::Eq, Box::new(expr), Box::new(right)),
+                tokens,
+            )),
+            _ => None,
+        }
+        Token::Neq => match parse_expression(tokens) {
+            Some((right, tokens)) => Some((
+                Expression::Oper(Operator::Neq, Box::new(expr), Box::new(right)),
+                tokens,
+            )),
+            _ => None,
+        }
         _ => None,
     }
 }
@@ -990,19 +1022,19 @@ fn main()
                 NewLine,
                 While(vec![
                     Variable(String::from("x")),
-                    Oper(Operator::Neq),
+                    Neq,
                     Literal(Value::Integer(0)),
                     NewLine,
                     Variable(String::from("x")),
                     Assign,
                     Variable(String::from("x")),
-                    Oper(Operator::Subtract),
+                    Subtract,
                     Literal(Value::Integer(1)),
                     NewLine,
                     Variable(String::from("temp")),
                     Assign,
                     Variable(String::from("y")),
-                    Oper(Operator::Add),
+                    Add,
                     Variable(String::from("z")),
                     NewLine,
                     Variable(String::from("y")),
