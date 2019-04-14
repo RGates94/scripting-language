@@ -434,7 +434,7 @@ fn parse_value<'a>(lexer: &mut Lexer<Token, &str>, state: &mut State) -> Result<
         Token::Identifier => parse_var(name, lexer, state),
         Token::Function => parse_function(lexer, state),
         Token::NewLine => Ok(()),
-        _ => Err(lexer.slice().to_string()),
+        _ => Err(name.to_string()),
     }
 }
 
