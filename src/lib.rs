@@ -335,13 +335,12 @@ fn parse_while(lexer: &mut Lexer<Token, &str>, index: usize) -> Result<Block, St
         match parse_block(lexer, index + block.len())? {
             Block::Statement(state) => {
                 block.push(state);
-                lexer.advance();
             }
             Block::Block(mut states) => {
                 block.append(&mut states);
-                lexer.advance();
             }
         }
+        lexer.advance();
     }
     block.push(Instruction::Goto(index));
     let mut output = vec![Instruction::ConditionalJump(
@@ -370,7 +369,6 @@ fn parse_var<'a>(
     lexer: &mut Lexer<Token, &str>,
     state: &mut State,
 ) -> Result<(), String> {
-    lexer.advance();
     let first = lexer.token;
     if first != Token::Assign {
         return Err(lexer.slice().to_string());
@@ -382,7 +380,6 @@ fn parse_var<'a>(
 }
 
 fn parse_function<'a>(lexer: &mut Lexer<Token, &str>, state: &mut State) -> Result<(), String> {
-    lexer.advance();
     let name = if lexer.token == Token::Identifier {
         lexer.slice().to_string()
     } else {
@@ -431,13 +428,12 @@ fn parse_function<'a>(lexer: &mut Lexer<Token, &str>, state: &mut State) -> Resu
 
 fn parse_value<'a>(lexer: &mut Lexer<Token, &str>, state: &mut State) -> Result<(), String> {
     let first = lexer.token;
+    let name = lexer.slice();
+    lexer.advance();
     match first {
-        Token::Identifier => parse_var(lexer.slice(), lexer, state),
+        Token::Identifier => parse_var(name, lexer, state),
         Token::Function => parse_function(lexer, state),
-        Token::NewLine => {
-            lexer.advance();
-            Ok(())
-        }
+        Token::NewLine => Ok(()),
         _ => Err(lexer.slice().to_string()),
     }
 }
