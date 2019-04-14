@@ -840,6 +840,9 @@ mod tests {
                 Expression::Var(String::from("y")),
             ))),
         );
+        assert_eq!(by_hand.run("main"), Some(Value::Integer(21)));
+        by_hand.insert(String::from("x"), Value::Integer(8));
+        assert_eq!(by_hand.run("main"), Some(Value::Integer(34)));
     }
 
     #[test]
@@ -903,8 +906,5 @@ fn main()
         );
         assert_eq!(program, Ok(by_hand));
         let mut program = program.unwrap();
-        assert_eq!(program.run("main"), Some(Value::Integer(21)));
-        program.insert(String::from("x"), Value::Integer(8));
-        assert_eq!(program.run("main"), Some(Value::Integer(34)));
     }
 }
