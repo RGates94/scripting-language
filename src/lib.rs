@@ -2,55 +2,8 @@ use logos::{Lexer, Logos};
 use std::collections::HashMap;
 use std::ops::{Add, Mul, Sub};
 
-fn pre_tokens_to_tokens(lexer: &mut Lexer<PreToken, &str>) -> Vec<Token> {
-    let mut tokens = vec![];
-
-    loop {
-        match lexer.token {
-            PreToken::Function => {
-                lexer.advance();
-                if lexer.token == PreToken::Identifier {
-                    tokens.push(Token::Function(String::from(lexer.slice())))
-                } else {
-                    panic!("Expected Identifier")
-                }
-            }
-            PreToken::If => tokens.push(Token::If),
-            PreToken::Else => tokens.push(Token::Else),
-            PreToken::For => tokens.push(Token::For),
-            PreToken::While => tokens.push(Token::While),
-            PreToken::EndBlock => tokens.push(Token::EndBlock),
-            PreToken::StartParen => tokens.push(Token::StartParen),
-            PreToken::EndParen => tokens.push(Token::EndParen),
-            PreToken::Eq => tokens.push(Token::Eq),
-            PreToken::Neq => tokens.push(Token::Neq),
-            PreToken::Assign => tokens.push(Token::Assign),
-            PreToken::Add => tokens.push(Token::Add),
-            PreToken::Subtract => tokens.push(Token::Subtract),
-            PreToken::Mul => tokens.push(Token::Multiply),
-            PreToken::Float => tokens.push(Token::Literal(Value::Float(
-                lexer
-                    .slice()
-                    .parse()
-                    .expect("Could not parse float from float token, internal error"),
-            ))),
-            PreToken::Integer => tokens.push(Token::Literal(Value::Integer(
-                lexer
-                    .slice()
-                    .parse()
-                    .expect("Could not parse integer from integer token, internal error"),
-            ))),
-            PreToken::NewLine => tokens.push(Token::NewLine),
-            PreToken::Identifier => tokens.push(Token::Variable(String::from(lexer.slice()))),
-            _ => break,
-        };
-        lexer.advance();
-    }
-    tokens
-}
-
 #[derive(Logos, Debug, PartialEq, Copy, Clone)]
-enum PreToken {
+enum Token {
     #[token = "fn"]
     Function,
     #[token = "if"]
@@ -91,27 +44,6 @@ enum PreToken {
     End,
     #[error]
     Error,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-enum Token {
-    Literal(Value),
-    Variable(String),
-    Function(String),
-    Add,
-    Subtract,
-    Multiply,
-    Eq,
-    Neq,
-    If,
-    Else,
-    For,
-    While,
-    EndBlock,
-    StartParen,
-    EndParen,
-    Assign,
-    NewLine,
 }
 
 /// Representation of any value in the scripting language, each variant is a data type.
@@ -318,58 +250,61 @@ impl Mul for Value {
     }
 }
 
-fn parse_expression(tokens: &[Token]) -> Option<(Expression, &[Token])> {
-    let (first, tokens) = match tokens.split_first() {
-        Some((first, tokens)) => (first, tokens),
-        None => return None,
-    };
+fn parse_expression(lexer: &mut Lexer<Token, &str>) -> Result<Expression, String> {
+    let first = lexer.token;
     let expr = match first {
-        Token::Literal(value) => Expression::Lit(value.clone()),
-        Token::Variable(name) => Expression::Var(name.clone()),
-        _ => return None,
+        Token::Integer => {
+            Expression::Lit(Value::Integer(lexer.slice().parse().expect(lexer.slice())))
+        }
+        Token::Float => Expression::Lit(Value::Float(lexer.slice().parse().unwrap())),
+        Token::Identifier => Expression::Var(lexer.slice().to_string()),
+        _ => return Err(lexer.slice().to_string()),
     };
-    let (second, tokens) = match tokens.split_first() {
-        Some((first, tokens)) => (first, tokens),
-        None => return Some((expr, tokens)),
-    };
+    lexer.advance();
+    let second = lexer.token;
     match second {
-        Token::NewLine => Some((expr, tokens)),
-        Token::Add => match parse_expression(tokens) {
-            Some((right, tokens)) => Some((
-                Expression::Oper(Operator::Add, Box::new(expr), Box::new(right)),
-                tokens,
-            )),
-            _ => None,
-        },
-        Token::Subtract => match parse_expression(tokens) {
-            Some((right, tokens)) => Some((
-                Expression::Oper(Operator::Subtract, Box::new(expr), Box::new(right)),
-                tokens,
-            )),
-            _ => None,
-        },
-        Token::Multiply => match parse_expression(tokens) {
-            Some((right, tokens)) => Some((
-                Expression::Oper(Operator::Multiply, Box::new(expr), Box::new(right)),
-                tokens,
-            )),
-            _ => None,
-        },
-        Token::Eq => match parse_expression(tokens) {
-            Some((right, tokens)) => Some((
-                Expression::Oper(Operator::Eq, Box::new(expr), Box::new(right)),
-                tokens,
-            )),
-            _ => None,
-        },
-        Token::Neq => match parse_expression(tokens) {
-            Some((right, tokens)) => Some((
-                Expression::Oper(Operator::Neq, Box::new(expr), Box::new(right)),
-                tokens,
-            )),
-            _ => None,
-        },
-        _ => None,
+        Token::NewLine => Ok(expr),
+        Token::Add => {
+            lexer.advance();
+            Ok(Expression::Oper(
+                Operator::Add,
+                Box::new(expr),
+                Box::new(parse_expression(lexer)?),
+            ))
+        }
+        Token::Subtract => {
+            lexer.advance();
+            Ok(Expression::Oper(
+                Operator::Subtract,
+                Box::new(expr),
+                Box::new(parse_expression(lexer)?),
+            ))
+        }
+        Token::Mul => {
+            lexer.advance();
+            Ok(Expression::Oper(
+                Operator::Multiply,
+                Box::new(expr),
+                Box::new(parse_expression(lexer)?),
+            ))
+        }
+        Token::Eq => {
+            lexer.advance();
+            Ok(Expression::Oper(
+                Operator::Eq,
+                Box::new(expr),
+                Box::new(parse_expression(lexer)?),
+            ))
+        }
+        Token::Neq => {
+            lexer.advance();
+            Ok(Expression::Oper(
+                Operator::Neq,
+                Box::new(expr),
+                Box::new(parse_expression(lexer)?),
+            ))
+        }
+        _ => Err(lexer.slice().to_string()),
     }
 }
 
@@ -378,40 +313,34 @@ enum Block {
     Block(Vec<Instruction>),
 }
 
-fn parse_assignment(name: String, tokens: &[Token]) -> Option<(Block, &[Token])> {
-    let tokens = if let Some((Token::Assign, tokens)) = tokens.split_first() {
-        tokens
-    } else {
-        return None;
+fn parse_assignment(name: String, lexer: &mut Lexer<Token, &str>) -> Result<Block, String> {
+    lexer.advance();
+    if lexer.token != Token::Assign {
+        return Err(lexer.slice().to_string());
     };
-    let (expr, tokens) = match parse_expression(tokens) {
-        Some(result) => result,
-        None => return None,
-    };
-    Some((Block::Statement(Instruction::Assign(name, expr)), tokens))
+    lexer.advance();
+    let expr = parse_expression(lexer)?;
+    Ok(Block::Statement(Instruction::Assign(name, expr)))
 }
 
-fn parse_while(tokens: &[Token], index: usize) -> Option<(Block, &[Token])> {
-    let (expr, mut tokens) = match parse_expression(tokens) {
-        Some(result) => result,
-        None => return None,
-    };
+fn parse_while(lexer: &mut Lexer<Token, &str>, index: usize) -> Result<Block, String> {
+    lexer.advance();
+    let expr = parse_expression(lexer)?;
     let mut block = Vec::new();
-    while !tokens.is_empty() {
-        if tokens.first() == Some(&Token::EndBlock) {
-            tokens = &tokens[2..];
+    while lexer.token != Token::End {
+        if lexer.token == Token::EndBlock {
+            lexer.advance();
             break;
         };
-        match parse_block(tokens, index + block.len()) {
-            Some((Block::Statement(state), remaining)) => {
+        match parse_block(lexer, index + block.len())? {
+            Block::Statement(state) => {
                 block.push(state);
-                tokens = remaining;
+                lexer.advance();
             }
-            Some((Block::Block(mut states), remaining)) => {
+            Block::Block(mut states) => {
                 block.append(&mut states);
-                tokens = remaining;
+                lexer.advance();
             }
-            None => return None,
         }
     }
     block.push(Instruction::Goto(index));
@@ -421,85 +350,95 @@ fn parse_while(tokens: &[Token], index: usize) -> Option<(Block, &[Token])> {
         index + block.len() + 1,
     )];
     output.append(&mut block);
-    Some((Block::Block(output), tokens))
+    Ok(Block::Block(output))
 }
 
-fn parse_block(tokens: &[Token], index: usize) -> Option<(Block, &[Token])> {
-    match tokens.split_first() {
-        Some((Token::Variable(name), tokens)) => parse_assignment(name.clone(), tokens),
-        Some((Token::While, tokens)) => parse_while(tokens, index),
-        Some((Token::NewLine, tokens)) => parse_block(tokens, index),
-        _ => return None,
+fn parse_block(lexer: &mut Lexer<Token, &str>, index: usize) -> Result<Block, String> {
+    match lexer.token {
+        Token::Identifier => parse_assignment(lexer.slice().to_string(), lexer),
+        Token::While => parse_while(lexer, index),
+        Token::NewLine => {
+            lexer.advance();
+            parse_block(lexer, index)
+        }
+        _ => return Err(lexer.slice().to_string()),
     }
 }
 
-fn parse_var<'a>(name: String, tokens: &'a [Token], state: &mut State) -> Option<&'a [Token]> {
-    let (first, tokens) = match tokens.split_first() {
-        Some((first, tokens)) => (first, tokens),
-        None => return None,
+fn parse_var<'a>(
+    name: &str,
+    lexer: &mut Lexer<Token, &str>,
+    state: &mut State,
+) -> Result<(), String> {
+    lexer.advance();
+    let first = lexer.token;
+    if first != Token::Assign {
+        return Err(lexer.slice().to_string());
     };
-    if *first != Token::Assign {
-        return None;
-    };
-    let (expr, tokens) = match parse_expression(tokens) {
-        Some(result) => result,
-        None => return None,
-    };
-    state.insert(name, expr.evaluate(state, &State::new()));
-    Some(tokens)
+    lexer.advance();
+    let expr = parse_expression(lexer)?;
+    state.insert(name.to_string(), expr.evaluate(state, &State::new()));
+    Ok(())
 }
 
-fn parse_function<'a>(name: String, tokens: &'a [Token], state: &mut State) -> Option<&'a [Token]> {
-    let mut tokens = match tokens.split_first() {
-        Some((Token::StartParen, tokens)) => tokens,
-        _ => return None,
+fn parse_function<'a>(lexer: &mut Lexer<Token, &str>, state: &mut State) -> Result<(), String> {
+    lexer.advance();
+    let name = if lexer.token == Token::Identifier {
+        lexer.slice().to_string()
+    } else {
+        return Err(lexer.slice().to_string());
     };
+    lexer.advance();
+    match lexer.token {
+        Token::StartParen => {}
+        _ => return Err(lexer.slice().to_string()),
+    };
+    lexer.advance();
     let mut args = vec![];
     loop {
-        match tokens.split_first() {
-            Some((Token::EndParen, remaining)) => {
-                tokens = remaining;
+        match lexer.token {
+            Token::EndParen => {
+                lexer.advance();
                 break;
             }
-            Some((Token::Variable(name), remaining)) => {
+            Token::Identifier => {
                 args.push(name.clone());
-                tokens = remaining;
+                lexer.advance();
             }
-            _ => return None,
+            _ => return Err(lexer.slice().to_string()),
         }
     }
-    while let Some((Token::NewLine, remaining)) = tokens.split_first() {
-        tokens = remaining;
+    while let Token::NewLine = lexer.token {
+        lexer.advance();
     }
     let mut statements = vec![];
-    while let Some((block, remaining)) = parse_block(tokens, statements.len()) {
+    let mut last_lexer = lexer.clone();
+    while let Ok(block) = parse_block(lexer, statements.len()) {
         match block {
             Block::Statement(statement) => statements.push(statement),
             Block::Block(mut new_statements) => statements.append(&mut new_statements),
         };
-        tokens = remaining;
+        lexer.advance();
+        last_lexer = lexer.clone();
     }
-    let (ret_val, tokens) = match parse_expression(tokens) {
-        Some((ret_val, tokens)) => (ret_val, tokens),
-        None => return None,
-    };
+    let ret_val = parse_expression(&mut last_lexer)?;
     state.insert(
         name,
         Value::Function(Box::new(Function::from_raw(args, statements, ret_val))),
     );
-    Some(tokens)
+    Ok(())
 }
 
-fn parse_value<'a>(tokens: &'a [Token], state: &mut State) -> Option<&'a [Token]> {
-    let (first, tokens) = match tokens.split_first() {
-        Some((first, tokens)) => (first, tokens),
-        None => return None,
-    };
+fn parse_value<'a>(lexer: &mut Lexer<Token, &str>, state: &mut State) -> Result<(), String> {
+    let first = lexer.token;
     match first {
-        Token::Variable(name) => parse_var(name.clone(), tokens, state),
-        Token::Function(name) => parse_function(name.clone(), tokens, state),
-        Token::NewLine => Some(tokens),
-        _ => None,
+        Token::Identifier => parse_var(lexer.slice(), lexer, state),
+        Token::Function => parse_function(lexer, state),
+        Token::NewLine => {
+            lexer.advance();
+            Ok(())
+        }
+        _ => Err(lexer.slice().to_string()),
     }
 }
 
@@ -511,17 +450,11 @@ impl State {
         }
     }
     /// Parses given string as a script, and returns the corresponding script
-    pub fn from_str(script: &str) -> Self {
-        let mut lexer = PreToken::lexer(script);
-        Self::from_tokens(&pre_tokens_to_tokens(&mut lexer))
-    }
-    // This constructs the State from the
-    fn from_tokens(mut tokens: &[Token]) -> Self {
+    pub fn from_str(script: &str) -> Result<Self, String> {
         let mut state = State::new();
-        while let Some(remaining) = parse_value(tokens, &mut state) {
-            tokens = remaining;
-        }
-        state
+        let mut lexer = Token::lexer(script);
+        while let Ok(_) = parse_value(&mut lexer, &mut state) {}
+        Ok(state)
     }
     ///Inserts a value into the State with specified key.
     pub fn insert(&mut self, key: String, value: Value) {
@@ -972,81 +905,10 @@ fn main()
     y
 ",
         );
-        assert_eq!(program, by_hand);
+        assert_eq!(program, Ok(by_hand));
+        let mut program = program.unwrap();
         assert_eq!(program.run("main"), Some(Value::Integer(21)));
         program.insert(String::from("x"), Value::Integer(8));
         assert_eq!(program.run("main"), Some(Value::Integer(34)));
-    }
-
-    #[test]
-    fn tokenize() {
-        use Token::*;
-        let tokens = pre_tokens_to_tokens(&mut PreToken::lexer(
-            "\
-x = 7
-
-fn main()
-    y = 1
-    z = 1
-    while x != 0
-        x = x - 1
-        temp = y + z
-        y = z
-        z = temp
-    end
-    y
-",
-        ));
-        assert_eq!(
-            tokens,
-            vec![
-                Variable(String::from("x")),
-                Assign,
-                Literal(Value::Integer(7)),
-                NewLine,
-                NewLine,
-                Function(String::from("main")),
-                StartParen,
-                EndParen,
-                NewLine,
-                Variable(String::from("y")),
-                Assign,
-                Literal(Value::Integer(1)),
-                NewLine,
-                Variable(String::from("z")),
-                Assign,
-                Literal(Value::Integer(1)),
-                NewLine,
-                While,
-                Variable(String::from("x")),
-                Neq,
-                Literal(Value::Integer(0)),
-                NewLine,
-                Variable(String::from("x")),
-                Assign,
-                Variable(String::from("x")),
-                Subtract,
-                Literal(Value::Integer(1)),
-                NewLine,
-                Variable(String::from("temp")),
-                Assign,
-                Variable(String::from("y")),
-                Add,
-                Variable(String::from("z")),
-                NewLine,
-                Variable(String::from("y")),
-                Assign,
-                Variable(String::from("z")),
-                NewLine,
-                Variable(String::from("z")),
-                Assign,
-                Variable(String::from("temp")),
-                NewLine,
-                EndBlock,
-                NewLine,
-                Variable(String::from("y")),
-                NewLine
-            ]
-        );
     }
 }

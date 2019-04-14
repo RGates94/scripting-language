@@ -5,4 +5,4 @@ authors = ["RGates94 <rgates275@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-logos = "0.9.7"
+logos = "0.10.0-rc2"
