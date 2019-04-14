@@ -332,7 +332,7 @@ fn parse_while(lexer: &mut Lexer<Token, &str>, index: usize) -> Result<Block, St
             lexer.advance();
             break;
         };
-        match parse_block(lexer, index + block.len())? {
+        match parse_block(lexer, index + block.len() + 1)? {
             Block::Statement(state) => {
                 block.push(state);
             }
@@ -906,5 +906,29 @@ fn main()
         );
         assert_eq!(program, Ok(by_hand));
         let mut program = program.unwrap();
+    }
+
+    #[test]
+    fn nested_while() {
+        let mut program = State::from_str(
+            "\
+x = 4
+
+fn main()
+    y = 3
+    z = 3
+    while x != 0
+        x = x - 1
+        while y != 0
+            y = y - 1
+            z = z + y
+        end
+        y = z
+    end
+    z
+",
+        );
+        let program = program.unwrap();
+        assert_eq!(program.run("main"), Some(Value::Integer(26_796)));
     }
 }
