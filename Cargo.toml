@@ -6,3 +6,4 @@ edition = "2018"
 
 [dependencies]
 logos = "0.10.0-rc2"
+fnv = "1.0.6"

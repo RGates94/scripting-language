@@ -1,5 +1,5 @@
+use fnv::FnvHashMap;
 use logos::{Lexer, Logos};
-use std::collections::HashMap;
 use std::ops::{Add, Mul, Sub};
 
 #[derive(Logos, Debug, PartialEq, Copy, Clone)]
@@ -68,7 +68,7 @@ pub struct Function {
 ///Represents a scripting language program
 #[derive(Debug, PartialEq, Clone)]
 pub struct State {
-    variables: HashMap<String, Value>,
+    variables: FnvHashMap<String, Value>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -441,7 +441,7 @@ impl State {
     /// Creates a new State containing no data.
     pub fn new() -> Self {
         State {
-            variables: HashMap::new(),
+            variables: FnvHashMap::default(),
         }
     }
     /// Parses given string as a script, and returns the corresponding script
