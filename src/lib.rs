@@ -386,9 +386,8 @@ fn parse_function<'a>(lexer: &mut Lexer<Token, &str>, state: &mut State) -> Resu
         return Err(lexer.slice().to_string());
     };
     lexer.advance();
-    match lexer.token {
-        Token::StartParen => {}
-        _ => return Err(lexer.slice().to_string()),
+    if lexer.token != Token::StartParen {
+        return Err(lexer.slice().to_string());
     };
     lexer.advance();
     let mut args = vec![];
@@ -399,7 +398,7 @@ fn parse_function<'a>(lexer: &mut Lexer<Token, &str>, state: &mut State) -> Resu
                 break;
             }
             Token::Identifier => {
-                args.push(name.clone());
+                args.push(lexer.slice().to_string());
                 lexer.advance();
             }
             _ => return Err(lexer.slice().to_string()),
@@ -905,7 +904,6 @@ fn main()
 ",
         );
         assert_eq!(program, Ok(by_hand));
-        let mut program = program.unwrap();
     }
 
     #[test]
