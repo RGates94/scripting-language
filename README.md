@@ -1,9 +1,9 @@
-# scripting-language
-A scripting language intented to be used with rustmania, still in its early stages
+# Scripting Language
+This project is an early stage scripting language intended to be used with RustMania.  The primary goal is making the language easy to learn, read, and integrate with Rust.
 
 # Grammar
 
-Here is a grammar for the currently implemented features:
+This is a grammar for the currently implemented features:
 
 ```
 Program := [Declaration]*
@@ -26,6 +26,8 @@ Operator := [+ | - | *]
 
 Function := [fn][Identifier][(][Identifier]*[)][\n][Statement]*[Expression]
 
-Statement := [Assignment | While]
+Statement := [Assignment | While | If]
 
-While := [while][Expression][Statement]*[end while]```
+While := [while][Expression][Statement]*[end]
+
+If := [if][Expression][Statement}*[else]?[Statement]*[end]```
