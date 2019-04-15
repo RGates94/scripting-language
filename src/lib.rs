@@ -429,13 +429,7 @@ fn parse_var<'a>(
     Ok(())
 }
 
-fn parse_function<'a>(lexer: &mut Lexer<Token, &str>, state: &mut State) -> Result<(), String> {
-    let name = if lexer.token == Token::Identifier {
-        lexer.slice().to_string()
-    } else {
-        return Err(lexer.slice().to_string());
-    };
-    lexer.advance();
+fn collect_arguments(lexer: &mut Lexer<Token, &str>) -> Result<Vec<String>, String> {
     if lexer.token != Token::StartParen {
         return Err(lexer.slice().to_string());
     };
@@ -445,7 +439,7 @@ fn parse_function<'a>(lexer: &mut Lexer<Token, &str>, state: &mut State) -> Resu
         match lexer.token {
             Token::EndParen => {
                 lexer.advance();
-                break;
+                return Ok(args)
             }
             Token::Identifier => {
                 args.push(lexer.slice().to_string());
@@ -454,6 +448,16 @@ fn parse_function<'a>(lexer: &mut Lexer<Token, &str>, state: &mut State) -> Resu
             _ => return Err(lexer.slice().to_string()),
         }
     }
+}
+
+fn parse_function<'a>(lexer: &mut Lexer<Token, &str>, state: &mut State) -> Result<(), String> {
+    let name = if lexer.token == Token::Identifier {
+        lexer.slice().to_string()
+    } else {
+        return Err(lexer.slice().to_string());
+    };
+    lexer.advance();
+    let args = collect_arguments(lexer)?;
     while let Token::NewLine = lexer.token {
         lexer.advance();
     }
