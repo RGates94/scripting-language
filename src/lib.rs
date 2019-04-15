@@ -252,7 +252,7 @@ impl Mul for Value {
 
 fn parse_expression(lexer: &mut Lexer<Token, &str>) -> Result<Expression, String> {
     let first = lexer.token;
-    let expr = match first {
+    let mut expr = match first {
         Token::Integer => {
             Expression::Lit(Value::Integer(lexer.slice().parse().expect(lexer.slice())))
         }
@@ -261,9 +261,21 @@ fn parse_expression(lexer: &mut Lexer<Token, &str>) -> Result<Expression, String
         _ => return Err(lexer.slice().to_string()),
     };
     lexer.advance();
+    if lexer.token == Token::StartParen {
+        lexer.advance();
+        let mut args = vec![];
+        while lexer.token != Token::EndParen {
+            match parse_expression(lexer) {
+                Ok(expression) =>
+                    args.push(expression),
+                Err(_) => break,
+            }
+        }
+        lexer.advance();
+        expr = Expression::Call(Box::new(expr), args);
+    }
     let second = lexer.token;
     match second {
-        Token::NewLine => Ok(expr),
         Token::Add => {
             lexer.advance();
             Ok(Expression::Oper(
@@ -304,7 +316,7 @@ fn parse_expression(lexer: &mut Lexer<Token, &str>) -> Result<Expression, String
                 Box::new(parse_expression(lexer)?),
             ))
         }
-        _ => Err(lexer.slice().to_string()),
+        _ => Ok(expr),
     }
 }
 
@@ -340,7 +352,11 @@ fn parse_if(lexer: &mut Lexer<Token, &str>, index: usize) -> Result<Block, Strin
                     lexer.advance();
                     break;
                 };
-                append_block(lexer,index + if_block.len() + else_block.len() + 2,&mut else_block)?;
+                append_block(
+                    lexer,
+                    index + if_block.len() + else_block.len() + 2,
+                    &mut else_block,
+                )?;
                 lexer.advance();
             }
             break;
@@ -439,7 +455,7 @@ fn collect_arguments(lexer: &mut Lexer<Token, &str>) -> Result<Vec<String>, Stri
         match lexer.token {
             Token::EndParen => {
                 lexer.advance();
-                return Ok(args)
+                return Ok(args);
             }
             Token::Identifier => {
                 args.push(lexer.slice().to_string());
@@ -574,7 +590,7 @@ mod tests {
     }
 
     #[test]
-    fn call_function() {
+    fn call_function_raw() {
         let mut environment = State::new();
 
         environment.insert(String::from("x"), Value::Float(-2.5));
@@ -1010,5 +1026,30 @@ fn main()
         );
         let program = program.unwrap();
         assert_eq!(program.run("main"), Some(Value::Integer(16)));
+    }
+
+    #[test]
+    fn call_function() {
+        let program = State::from_str(
+            "\
+fn fib(x)
+    if x == 1
+        z = 1
+    else
+        if x == 2
+            z = 1
+        else
+            z = fib(x - 1) + fib(x - 2)
+        end
+    end
+    z
+
+fn main ()
+    y = 10
+    fib(y)
+",
+        );
+        let program = program.unwrap();
+        assert_eq!(program.run("main"), Some(Value::Integer(55)));
     }
 }
