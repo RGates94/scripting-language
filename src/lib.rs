@@ -323,6 +323,46 @@ fn parse_assignment(name: String, lexer: &mut Lexer<Token, &str>) -> Result<Bloc
     Ok(Block::Statement(Instruction::Assign(name, expr)))
 }
 
+fn parse_if(lexer: &mut Lexer<Token, &str>, index: usize) -> Result<Block, String> {
+    lexer.advance();
+    let expr = parse_expression(lexer)?;
+    let mut if_block = Vec::new();
+    let mut else_block = Vec::new();
+    while lexer.token != Token::End {
+        if lexer.token == Token::EndBlock {
+            lexer.advance();
+            break;
+        };
+        if lexer.token == Token::Else {
+            lexer.advance();
+            while lexer.token != Token::End {
+                if lexer.token == Token::EndBlock {
+                    lexer.advance();
+                    break;
+                };
+                append_block(lexer,index + if_block.len() + else_block.len() + 2,&mut else_block)?;
+                lexer.advance();
+            }
+            break;
+        };
+        append_block(lexer, index + if_block.len() + 1, &mut if_block)?;
+        lexer.advance();
+    }
+    if !else_block.is_empty() {
+        if_block.push(Instruction::Goto(
+            index + if_block.len() + else_block.len() + 2,
+        ));
+    }
+    let mut output = vec![Instruction::ConditionalJump(
+        expr,
+        index + 1,
+        index + if_block.len() + 1,
+    )];
+    output.append(&mut if_block);
+    output.append(&mut else_block);
+    Ok(Block::Block(output))
+}
+
 fn parse_while(lexer: &mut Lexer<Token, &str>, index: usize) -> Result<Block, String> {
     lexer.advance();
     let expr = parse_expression(lexer)?;
@@ -332,14 +372,7 @@ fn parse_while(lexer: &mut Lexer<Token, &str>, index: usize) -> Result<Block, St
             lexer.advance();
             break;
         };
-        match parse_block(lexer, index + block.len() + 1)? {
-            Block::Statement(state) => {
-                block.push(state);
-            }
-            Block::Block(mut states) => {
-                block.append(&mut states);
-            }
-        }
+        append_block(lexer, index + block.len() + 1, &mut block)?;
         lexer.advance();
     }
     block.push(Instruction::Goto(index));
@@ -352,9 +385,26 @@ fn parse_while(lexer: &mut Lexer<Token, &str>, index: usize) -> Result<Block, St
     Ok(Block::Block(output))
 }
 
+fn append_block(
+    lexer: &mut Lexer<Token, &str>,
+    index: usize,
+    block: &mut Vec<Instruction>,
+) -> Result<(), String> {
+    match parse_block(lexer, index)? {
+        Block::Statement(state) => {
+            block.push(state);
+        }
+        Block::Block(mut states) => {
+            block.append(&mut states);
+        }
+    }
+    Ok(())
+}
+
 fn parse_block(lexer: &mut Lexer<Token, &str>, index: usize) -> Result<Block, String> {
     match lexer.token {
         Token::Identifier => parse_assignment(lexer.slice().to_string(), lexer),
+        Token::If => parse_if(lexer, index),
         Token::While => parse_while(lexer, index),
         Token::NewLine => {
             lexer.advance();
@@ -928,5 +978,33 @@ fn main()
         );
         let program = program.unwrap();
         assert_eq!(program.run("main"), Some(Value::Integer(26_796)));
+    }
+
+    #[test]
+    fn test_if() {
+        let mut program = State::from_str(
+            "\
+x = 4
+
+fn main()
+    y = 0
+    z = 0
+    while x != 0
+        y = y + 1
+        if x == y
+             y = 0
+        else
+            if x == 2
+                y = 5
+            end
+            z = z + x
+        end
+        x = x - 1
+    end
+    x + y + z
+",
+        );
+        let program = program.unwrap();
+        assert_eq!(program.run("main"), Some(Value::Integer(16)));
     }
 }
