@@ -957,7 +957,7 @@ mod tests {
                 Expression::Var(String::from("y")),
             ))),
         );
-        let mut program = State::from_str(
+        let program = State::from_str(
             "\
 x = 7
 
@@ -978,7 +978,7 @@ fn main()
 
     #[test]
     fn nested_while() {
-        let mut program = State::from_str(
+        let program = State::from_str(
             "\
 x = 4
 
@@ -1002,7 +1002,7 @@ fn main()
 
     #[test]
     fn test_if() {
-        let mut program = State::from_str(
+        let program = State::from_str(
             "\
 x = 4
 
