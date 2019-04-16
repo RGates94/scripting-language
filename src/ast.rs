@@ -1,6 +1,6 @@
+use crate::parser::from_str;
 use fnv::FnvHashMap;
 use std::ops::{Add, Mul, Sub};
-use crate::parser::from_str;
 
 /// Representation of any value in the scripting language, each variant is a data type.
 #[derive(Debug, PartialEq, Clone)]
@@ -126,10 +126,10 @@ impl Expression {
                     .expect("Failed to add"),
                 Operator::Subtract => (left.evaluate(state, globals)
                     - right.evaluate(state, globals))
-                    .expect("Failed to add"),
+                .expect("Failed to add"),
                 Operator::Multiply => (left.evaluate(state, globals)
                     * right.evaluate(state, globals))
-                    .expect("Failed to add"),
+                .expect("Failed to add"),
                 Operator::Eq => {
                     Value::Boolean(left.evaluate(state, globals) == right.evaluate(state, globals))
                 }
@@ -234,7 +234,6 @@ impl State {
         })
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -749,5 +748,29 @@ fn main ()
         );
         let program = program.unwrap();
         assert_eq!(program.run("main"), Some(Value::Integer(55)));
+    }
+
+    #[test]
+    fn order_of_operations() {
+        let program_one = State::from_str(
+            "\
+fn main()
+    x = 3
+    y = 4
+    z = 5
+    x + y * z",
+        )
+        .expect("program 1 failed");
+        let program_two = State::from_str(
+            "\
+fn main()
+    x = 3
+    y = 4
+    z = 5
+    x * y + z",
+        )
+        .expect("program 2 failed");
+        assert_eq!(program_one.run("main"), Some(Value::Integer(23)));
+        assert_eq!(program_two.run("main"), Some(Value::Integer(17)));
     }
 }

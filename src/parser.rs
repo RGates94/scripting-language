@@ -1,5 +1,5 @@
+use crate::ast::{Expression, Function, Instruction, Operator, State, Value};
 use logos::{Lexer, Logos};
-use crate::ast::{Expression,Function,Instruction,Operator,State,Value};
 
 #[derive(Logos, Debug, PartialEq, Copy, Clone)]
 enum Token {
@@ -45,7 +45,39 @@ enum Token {
     Error,
 }
 
-fn parse_expression(lexer: &mut Lexer<Token, &str>) -> Result<Expression, String> {
+fn parse_operator(
+    lexer: &mut Lexer<Token, &str>,
+    left_precedence: u8,
+    expr: Expression,
+) -> Result<Expression, String> {
+    let second = lexer.token;
+    let (op, right_precedence) = match second {
+        Token::Add => (Operator::Add, 2),
+        Token::Subtract => (Operator::Subtract, 2),
+        Token::Mul => (Operator::Multiply, 3),
+        Token::Eq => (Operator::Eq, 1),
+        Token::Neq => (Operator::Neq, 1),
+        _ => return Ok(expr),
+    };
+    if left_precedence > right_precedence {
+        Ok(expr)
+    } else {
+        lexer.advance();
+        Ok({
+            let expr = Expression::Oper(
+                op,
+                Box::new(expr),
+                Box::new(parse_expression(lexer, right_precedence)?),
+            );
+            parse_operator(lexer, left_precedence, expr)?
+        })
+    }
+}
+
+fn parse_expression(
+    lexer: &mut Lexer<Token, &str>,
+    left_precedence: u8,
+) -> Result<Expression, String> {
     let first = lexer.token;
     let mut expr = match first {
         Token::Integer => {
@@ -60,59 +92,15 @@ fn parse_expression(lexer: &mut Lexer<Token, &str>) -> Result<Expression, String
         lexer.advance();
         let mut args = vec![];
         while lexer.token != Token::EndParen {
-            match parse_expression(lexer) {
-                Ok(expression) =>
-                    args.push(expression),
+            match parse_expression(lexer, 0) {
+                Ok(expression) => args.push(expression),
                 Err(_) => break,
             }
         }
         lexer.advance();
         expr = Expression::Call(Box::new(expr), args);
     }
-    let second = lexer.token;
-    match second {
-        Token::Add => {
-            lexer.advance();
-            Ok(Expression::Oper(
-                Operator::Add,
-                Box::new(expr),
-                Box::new(parse_expression(lexer)?),
-            ))
-        }
-        Token::Subtract => {
-            lexer.advance();
-            Ok(Expression::Oper(
-                Operator::Subtract,
-                Box::new(expr),
-                Box::new(parse_expression(lexer)?),
-            ))
-        }
-        Token::Mul => {
-            lexer.advance();
-            Ok(Expression::Oper(
-                Operator::Multiply,
-                Box::new(expr),
-                Box::new(parse_expression(lexer)?),
-            ))
-        }
-        Token::Eq => {
-            lexer.advance();
-            Ok(Expression::Oper(
-                Operator::Eq,
-                Box::new(expr),
-                Box::new(parse_expression(lexer)?),
-            ))
-        }
-        Token::Neq => {
-            lexer.advance();
-            Ok(Expression::Oper(
-                Operator::Neq,
-                Box::new(expr),
-                Box::new(parse_expression(lexer)?),
-            ))
-        }
-        _ => Ok(expr),
-    }
+    parse_operator(lexer, left_precedence, expr)
 }
 
 enum Block {
@@ -126,13 +114,13 @@ fn parse_assignment(name: String, lexer: &mut Lexer<Token, &str>) -> Result<Bloc
         return Err(lexer.slice().to_string());
     };
     lexer.advance();
-    let expr = parse_expression(lexer)?;
+    let expr = parse_expression(lexer, 0)?;
     Ok(Block::Statement(Instruction::Assign(name, expr)))
 }
 
 fn parse_if(lexer: &mut Lexer<Token, &str>, index: usize) -> Result<Block, String> {
     lexer.advance();
-    let expr = parse_expression(lexer)?;
+    let expr = parse_expression(lexer, 0)?;
     let mut if_block = Vec::new();
     let mut else_block = Vec::new();
     while lexer.token != Token::End {
@@ -176,7 +164,7 @@ fn parse_if(lexer: &mut Lexer<Token, &str>, index: usize) -> Result<Block, Strin
 
 fn parse_while(lexer: &mut Lexer<Token, &str>, index: usize) -> Result<Block, String> {
     lexer.advance();
-    let expr = parse_expression(lexer)?;
+    let expr = parse_expression(lexer, 0)?;
     let mut block = Vec::new();
     while lexer.token != Token::End {
         if lexer.token == Token::EndBlock {
@@ -235,7 +223,7 @@ fn parse_var<'a>(
         return Err(lexer.slice().to_string());
     };
     lexer.advance();
-    let expr = parse_expression(lexer)?;
+    let expr = parse_expression(lexer, 0)?;
     state.insert(name.to_string(), expr.evaluate(state, &State::new()));
     Ok(())
 }
@@ -282,7 +270,7 @@ fn parse_function<'a>(lexer: &mut Lexer<Token, &str>, state: &mut State) -> Resu
         lexer.advance();
         last_lexer = lexer.clone();
     }
-    let ret_val = parse_expression(&mut last_lexer)?;
+    let ret_val = parse_expression(&mut last_lexer, 0)?;
     *lexer = last_lexer;
     state.insert(
         name,
