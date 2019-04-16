@@ -1,5 +1,5 @@
 use logos::{Lexer, Logos};
-use crate::{Expression,Function,Instruction,Operator,State,Value};
+use crate::ast::{Expression,Function,Instruction,Operator,State,Value};
 
 #[derive(Logos, Debug, PartialEq, Copy, Clone)]
 enum Token {
