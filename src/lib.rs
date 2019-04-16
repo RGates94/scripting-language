@@ -91,7 +91,8 @@ enum Operator {
     Add,
     Subtract,
     Multiply,
-    Divide,
+    _IntDivide,
+    _FloatDivide,
     Eq,
     Neq,
 }
