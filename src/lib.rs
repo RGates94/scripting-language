@@ -488,6 +488,7 @@ fn parse_function<'a>(lexer: &mut Lexer<Token, &str>, state: &mut State) -> Resu
         last_lexer = lexer.clone();
     }
     let ret_val = parse_expression(&mut last_lexer)?;
+    *lexer = last_lexer;
     state.insert(
         name,
         Value::Function(Box::new(Function::from_raw(args, statements, ret_val))),
@@ -518,7 +519,9 @@ impl State {
     pub fn from_str(script: &str) -> Result<Self, String> {
         let mut state = State::new();
         let mut lexer = Token::lexer(script);
-        while let Ok(_) = parse_value(&mut lexer, &mut state) {}
+        while lexer.token != Token::End {
+            parse_value(&mut lexer, &mut state)?;
+        }
         Ok(state)
     }
     ///Inserts a value into the State with specified key.
