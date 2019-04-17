@@ -52,8 +52,8 @@ fn parse_operator(
     left_precedence: u8,
     expr: Expression,
 ) -> Result<Expression, String> {
-    let second = lexer.token;
-    let (op, right_precedence) = match second {
+    let op_token = lexer.token;
+    let (op, right_precedence) = match op_token {
         Token::Add => (Operator::Add, 2),
         Token::Subtract => (Operator::Subtract, 2),
         Token::Mul => (Operator::Multiply, 3),
@@ -80,8 +80,8 @@ fn parse_expression(
     lexer: &mut Lexer<Token, &str>,
     left_precedence: u8,
 ) -> Result<Expression, String> {
-    let first = lexer.token;
-    let mut expr = match first {
+    let variable = lexer.token;
+    let mut expr = match variable {
         Token::Integer => {
             Expression::Lit(Value::Integer(lexer.slice().parse().expect(lexer.slice())))
         }
@@ -93,7 +93,7 @@ fn parse_expression(
             while lexer.token != Token::Quotation {
                 lexer.advance();
             }
-            let end = lexer.range().end - 1;
+            let end = lexer.range().start;
             Expression::Lit(Value::Text(lexer.source[start..end].to_string()))
         }
         _ => return Err(lexer.slice().to_string()),
