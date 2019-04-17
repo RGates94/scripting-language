@@ -790,4 +790,66 @@ fn main()
             Some(Value::Text(String::from("Hello, World!")))
         );
     }
+
+    #[test]
+    fn parentheses() {
+        let program_one = State::from_str(
+            "\
+fn main()
+    x = 3
+    y = 4
+    z = 5
+    (x + y) * z",
+        )
+        .expect("program 1 failed");
+        let program_two = State::from_str(
+            "\
+fn main()
+    x = 3
+    y = 4
+    z = 5
+    x * (y + z)",
+        )
+        .expect("program 2 failed");
+        let program_three = State::from_str(
+            "\
+fn main()
+    x = 3
+    y = 4
+    z = 5
+    x + (y * z)",
+        )
+            .expect("program 3 failed");
+        let program_four = State::from_str(
+            "\
+fn main()
+    x = 3
+    y = 4
+    z = 5
+    (x * y) + z",
+        )
+            .expect("program 4 failed");
+        let program_five = State::from_str(
+            "\
+fn main()
+    x = 3
+    y = 4
+    z = 5
+    x + (y * z",
+        );
+        let program_six = State::from_str(
+            "\
+fn main()
+    x = 3
+    y = 4
+    z = 5
+    x * y) + z",
+        );
+        assert_eq!(program_one.run("main"), Some(Value::Integer(35)));
+        assert_eq!(program_two.run("main"), Some(Value::Integer(27)));
+        assert_eq!(program_three.run("main"), Some(Value::Integer(23)));
+        assert_eq!(program_four.run("main"), Some(Value::Integer(17)));
+        assert!(program_five.is_err());
+        assert!(program_six.is_err());
+    }
 }
