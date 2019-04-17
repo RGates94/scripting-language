@@ -773,4 +773,21 @@ fn main()
         assert_eq!(program_one.run("main"), Some(Value::Integer(23)));
         assert_eq!(program_two.run("main"), Some(Value::Integer(17)));
     }
+
+    #[test]
+    fn string_literals() {
+        let program = State::from_str(
+            "\
+fn main()
+    z = \"Hello, \"
+    x = \"World!\"
+    z + x
+    ",
+        );
+        let program = program.unwrap();
+        assert_eq!(
+            program.run("main"),
+            Some(Value::Text(String::from("Hello, World!")))
+        );
+    }
 }

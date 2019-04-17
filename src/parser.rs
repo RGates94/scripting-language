@@ -37,6 +37,8 @@ enum Token {
     Integer,
     #[token = "\n"]
     NewLine,
+    #[token = "\""]
+    Quotation,
     #[regex = "[a-zA-Z][a-zA-Z0-9]*"]
     Identifier,
     #[end]
@@ -85,6 +87,15 @@ fn parse_expression(
         }
         Token::Float => Expression::Lit(Value::Float(lexer.slice().parse().unwrap())),
         Token::Identifier => Expression::Var(lexer.slice().to_string()),
+        Token::Quotation => {
+            lexer.advance();
+            let start = lexer.range().start;
+            while lexer.token != Token::Quotation {
+                lexer.advance();
+            }
+            let end = lexer.range().end - 1;
+            Expression::Lit(Value::Text(lexer.source[start..end].to_string()))
+        }
         _ => return Err(lexer.slice().to_string()),
     };
     lexer.advance();
