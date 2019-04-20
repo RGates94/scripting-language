@@ -95,7 +95,7 @@ fn parse_expression(
             }
             let end = lexer.range().start;
             Expression::Lit(Value::Text(lexer.source[start..end].to_string()))
-        },
+        }
         Token::StartParen => {
             lexer.advance();
             let expr = parse_expression(lexer, 0)?;

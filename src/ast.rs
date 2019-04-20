@@ -819,7 +819,7 @@ fn main()
     z = 5
     x + (y * z)",
         )
-            .expect("program 3 failed");
+        .expect("program 3 failed");
         let program_four = State::from_str(
             "\
 fn main()
@@ -828,7 +828,7 @@ fn main()
     z = 5
     (x * y) + z",
         )
-            .expect("program 4 failed");
+        .expect("program 4 failed");
         let program_five = State::from_str(
             "\
 fn main()
