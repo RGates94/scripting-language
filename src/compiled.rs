@@ -1,5 +1,4 @@
 use std::ops::{Add, Mul, Sub};
-use std::time::Instant;
 use crate::ast::Operator;
 
 //The structs in this module currently overlap with most of the functionality from ast.rs
@@ -69,7 +68,6 @@ impl CompiledFunction {
             .for_each(|(name, value)| inner_state.insert(name.clone(), value));
         let mut current_instruction = 0;
         while let Some(instruction) = self.instructions.get(current_instruction) {
-            //println!("{:?}", &inner_state);
             if let Some(line) = instruction.execute(&mut inner_state, globals) {
                 current_instruction = line;
             } else {
@@ -236,7 +234,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn nested_while_by_hand() {
+    fn nested_while_manual() {
 
         let mut program = Program::from(vec![
             Value::Integer(7),
@@ -295,7 +293,10 @@ mod tests {
                 CompiledExpression::Var(1),
             ))),]);
 
-        assert_eq!(program.run(1, vec![Value::Integer(4)]), Some(Value::Integer(26_796)));
+        assert_eq!(program.run(1, vec![Value::Integer(4)]), Some(Value::Integer(26_796)));}
+
+    #[test]
+    fn fibonacci_manual() {
 
         let fib = Program::from(vec![
             Value::Integer(7),
