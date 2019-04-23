@@ -7,3 +7,4 @@ edition = "2018"
 [dependencies]
 logos = "0.10.0-rc2"
 fnv = "1.0.6"
+shrinkwraprs = "0.2.1"

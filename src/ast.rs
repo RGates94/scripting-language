@@ -1,6 +1,7 @@
 use crate::parser::from_str;
 use fnv::FnvHashMap;
 use std::ops::{Add, Mul, Sub};
+use shrinkwraprs::Shrinkwrap;
 
 /// Representation of any value in the scripting language, each variant is a data type.
 #[derive(Debug, PartialEq, Clone)]
@@ -22,7 +23,7 @@ pub struct Function {
 }
 
 ///Represents a scripting language program
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Shrinkwrap)]
 pub struct State {
     variables: FnvHashMap<String, Value>,
 }
