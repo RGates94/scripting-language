@@ -38,6 +38,7 @@ pub(crate) enum LinearizedInstruction {
     CopyRelative(usize, usize),
     Add(usize, usize, usize),
     Subtract(usize, usize, usize),
+    Eq(usize, usize, usize),
     Goto(usize),
     ConditionalJump(usize, usize, usize),
 }
@@ -120,6 +121,14 @@ impl LinearizedInstruction {
             }
             LinearizedInstruction::Subtract(name, left, right) => {
                 program.subtract(
+                    name + local_address,
+                    left + local_address,
+                    right + local_address,
+                );
+                None
+            }
+            LinearizedInstruction::Eq(name, left, right) => {
+                program.equal(
                     name + local_address,
                     left + local_address,
                     right + local_address,
@@ -286,6 +295,10 @@ impl Program {
             - self.variables[right].clone())
         .expect("failed to subtract");
     }
+    fn equal(&mut self, destination: usize, left: usize, right: usize) {
+        self.variables[destination] =
+            Value::Boolean(self.variables[left].clone() == self.variables[right].clone())
+    }
     ///Returns the corresponding value if key is in the State, and None otherwise
     pub fn get(&self, key: usize) -> Option<&Value> {
         self.variables.get(key)
@@ -364,25 +377,11 @@ mod tests {
                 vec![
                     LinearizedInstruction::AssignLiteral(3, Value::Integer(1)),
                     LinearizedInstruction::AssignLiteral(4, Value::Integer(2)),
-                    LinearizedInstruction::Assign(
-                        1,
-                        LinearizedExpression::Oper(
-                            Operator::Eq,
-                            Box::new(LinearizedExpression::Var(0)),
-                            Box::new(LinearizedExpression::Lit(Value::Integer(1))),
-                        ),
-                    ),
+                    LinearizedInstruction::Eq(1, 0, 3),
                     LinearizedInstruction::ConditionalJump(1, 4, 6),
                     LinearizedInstruction::AssignLiteral(1, Value::Integer(1)),
                     LinearizedInstruction::Goto(15),
-                    LinearizedInstruction::Assign(
-                        1,
-                        LinearizedExpression::Oper(
-                            Operator::Eq,
-                            Box::new(LinearizedExpression::Var(0)),
-                            Box::new(LinearizedExpression::Lit(Value::Integer(2))),
-                        ),
-                    ),
+                    LinearizedInstruction::Eq(1, 0, 4),
                     LinearizedInstruction::ConditionalJump(1, 8, 10),
                     LinearizedInstruction::AssignLiteral(1, Value::Integer(1)),
                     LinearizedInstruction::Goto(15),
