@@ -34,6 +34,7 @@ pub(crate) enum LinearizedInstruction {
     Assign(usize, LinearizedExpression),
     AssignLiteral(usize, Value),
     CopyRelative(usize, usize),
+    Call(usize, Vec<usize>),
     Add(usize, usize, usize),
     Subtract(usize, usize, usize),
     Eq(usize, usize, usize),
@@ -103,6 +104,14 @@ impl LinearizedInstruction {
             }
             LinearizedInstruction::CopyRelative(name, var_address) => {
                 program.copy(*name + local_address, var_address + local_address);
+                None
+            }
+            LinearizedInstruction::Call(function, args) => {
+                if let Value::Function(f) = program.variables[*function].clone() {
+                    f.call(args.iter().map(|x| program.variables[*x + local_address].clone()).collect(), program, next_frame);
+                } else {
+                    panic!("Tried to call non-function")
+                };
                 None
             }
             LinearizedInstruction::Add(name, left, right) => {
@@ -358,7 +367,7 @@ mod tests {
         ]);
 
         assert_eq!(
-            program.run(1, vec![Value::Integer(4)]),
+            program.run(1, vec![Value::Integer(6)]),
             Some(Value::Integer(26_796))
         );
     }
@@ -380,27 +389,17 @@ mod tests {
                     LinearizedInstruction::Eq(1, 0, 3),
                     LinearizedInstruction::ConditionalJump(1, 4, 6),
                     LinearizedInstruction::AssignLiteral(0, Value::Integer(1)),
-                    LinearizedInstruction::Goto(15),
+                    LinearizedInstruction::Goto(17),
                     LinearizedInstruction::Eq(1, 0, 4),
                     LinearizedInstruction::ConditionalJump(1, 8, 10),
                     LinearizedInstruction::AssignLiteral(0, Value::Integer(1)),
-                    LinearizedInstruction::Goto(15),
+                    LinearizedInstruction::Goto(17),
                     LinearizedInstruction::Subtract(1, 0, 3),
-                    LinearizedInstruction::Assign(
-                        1,
-                        LinearizedExpression::Call(
-                            Box::new(LinearizedExpression::Var(5)),
-                            vec![LinearizedExpression::Var(1)],
-                        ),
-                    ),
+                    LinearizedInstruction::Call(5, vec![1]),
+                    LinearizedInstruction::CopyRelative(1, 5),
                     LinearizedInstruction::Subtract(2, 0, 4),
-                    LinearizedInstruction::Assign(
-                        2,
-                        LinearizedExpression::Call(
-                            Box::new(LinearizedExpression::Var(5)),
-                            vec![LinearizedExpression::Var(2)],
-                        ),
-                    ),
+                    LinearizedInstruction::Call(5, vec![2]),
+                    LinearizedInstruction::CopyRelative(2, 5),
                     LinearizedInstruction::Add(0, 1, 2),
                 ],
             ))),
