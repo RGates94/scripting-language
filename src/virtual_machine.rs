@@ -67,7 +67,7 @@ impl CompiledFunction {
         }
     }
     /// Calls self with specified args and specified global state
-    pub fn call(&self, args: Vec<Value>, program: &mut Program, local_address: usize) -> Value {
+    pub fn call(&self, args: Vec<Value>, program: &mut Program, local_address: usize) {
         (0..self.arguments)
             .zip(args)
             .for_each(|(name, value)| program.insert(name + local_address, value));
@@ -81,7 +81,6 @@ impl CompiledFunction {
                 current_instruction += 1;
             }
         }
-        program.variables[local_address].clone()
     }
 }
 
@@ -160,13 +159,16 @@ impl LinearizedExpression {
         match self {
             LinearizedExpression::Call(name, args) => {
                 match name.evaluate(program, local_address, next_frame) {
-                    Value::Function(inner) => inner.call(
-                        args.iter()
-                            .map(|expr| expr.evaluate(program, local_address, next_frame))
-                            .collect(),
-                        program,
-                        next_frame,
-                    ),
+                    Value::Function(inner) => {
+                        inner.call(
+                            args.iter()
+                                .map(|expr| expr.evaluate(program, local_address, next_frame))
+                                .collect(),
+                            program,
+                            next_frame,
+                        );
+                        program.variables[next_frame].clone()
+                    }
                     _ => panic!("Tried to call a non-function value"),
                 }
             }
@@ -313,8 +315,12 @@ impl Program {
     ///Returns the result of calling entry_point if it is found in the State, and None otherwise
     pub fn run(&mut self, entry_point: usize, args: Vec<Value>) -> Option<Value> {
         let n = self.variables.get(entry_point).cloned();
+        let local_address = self.variables.len();
         n.map(|val| match val {
-            Value::Function(main) => main.call(args, self, self.variables.len()),
+            Value::Function(main) => {
+                main.call(args, self, local_address);
+                self.variables[local_address].clone()
+            }
             val => val.clone(),
         })
     }
