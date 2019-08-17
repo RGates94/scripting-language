@@ -1,5 +1,5 @@
 use crate::ast::Operator;
-use crate::compiled::Value::Integer;
+use crate::virtual_machine::Value::Integer;
 use std::ops::{Add, Mul, Sub};
 
 //The structs in this module currently overlap with most of the functionality from ast.rs

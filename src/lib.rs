@@ -1,5 +1,5 @@
 mod ast;
-pub mod compiled;
+pub mod virtual_machine;
 mod parser;
 
 pub use crate::ast::*;
