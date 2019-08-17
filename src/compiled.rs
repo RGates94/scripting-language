@@ -21,8 +21,8 @@ pub enum Value {
 pub struct CompiledFunction {
     arguments: Vec<usize>,
     capacity: usize,
-    instructions: Vec<CompiledInstruction>,
-    ret_val: CompiledExpression,
+    instructions: Vec<LinearizedInstruction>,
+    ret_val: LinearizedExpression,
 }
 
 ///Represents a scripting language program
@@ -32,27 +32,27 @@ pub struct Program {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum CompiledInstruction {
-    Assign(usize, CompiledExpression),
+pub(crate) enum LinearizedInstruction {
+    Assign(usize, LinearizedExpression),
     AssignLiteral(usize, Value),
     Goto(usize),
-    ConditionalJump(CompiledExpression, usize, usize),
+    ConditionalJump(LinearizedExpression, usize, usize),
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum CompiledExpression {
-    Call(Box<CompiledExpression>, Vec<CompiledExpression>),
+pub(crate) enum LinearizedExpression {
+    Call(Box<LinearizedExpression>, Vec<LinearizedExpression>),
     Var(usize),
     Lit(Value),
-    Oper(Operator, Box<CompiledExpression>, Box<CompiledExpression>),
+    Oper(Operator, Box<LinearizedExpression>, Box<LinearizedExpression>),
 }
 
 impl CompiledFunction {
     pub(crate) fn from_raw(
         arguments: Vec<usize>,
         capacity: usize,
-        instructions: Vec<CompiledInstruction>,
-        ret_val: CompiledExpression,
+        instructions: Vec<LinearizedInstruction>,
+        ret_val: LinearizedExpression,
     ) -> Self {
         CompiledFunction {
             arguments,
@@ -82,7 +82,7 @@ impl CompiledFunction {
     }
 }
 
-impl CompiledInstruction {
+impl LinearizedInstruction {
     pub fn execute(
         &self,
         program: &mut Program,
@@ -90,17 +90,17 @@ impl CompiledInstruction {
         next_frame: usize,
     ) -> Option<usize> {
         match self {
-            CompiledInstruction::Assign(name, expr) => {
+            LinearizedInstruction::Assign(name, expr) => {
                 let ret = expr.evaluate(program, local_address, next_frame);
                 program.insert(*name + local_address, ret);
                 None
             }
-            CompiledInstruction::AssignLiteral(name, val) => {
+            LinearizedInstruction::AssignLiteral(name, val) => {
                 program.insert(*name + local_address, val.clone());
                 None
             }
-            CompiledInstruction::Goto(line) => Some(*line),
-            CompiledInstruction::ConditionalJump(condition, if_true, otherwise) => {
+            LinearizedInstruction::Goto(line) => Some(*line),
+            LinearizedInstruction::ConditionalJump(condition, if_true, otherwise) => {
                 if condition.evaluate(program, local_address, next_frame) == Value::Boolean(true) {
                     Some(*if_true)
                 } else {
@@ -111,7 +111,7 @@ impl CompiledInstruction {
     }
 }
 
-impl CompiledExpression {
+impl LinearizedExpression {
     pub fn evaluate(
         &self,
         program: &mut Program,
@@ -119,7 +119,7 @@ impl CompiledExpression {
         next_frame: usize,
     ) -> Value {
         match self {
-            CompiledExpression::Call(name, args) => {
+            LinearizedExpression::Call(name, args) => {
                 match name.evaluate(program, local_address, next_frame) {
                     Value::Function(inner) => inner.call(
                         args.iter()
@@ -131,15 +131,15 @@ impl CompiledExpression {
                     _ => panic!("Tried to call a non-function value"),
                 }
             }
-            CompiledExpression::Var(id) => if *id + local_address < next_frame {
+            LinearizedExpression::Var(id) => if *id + local_address < next_frame {
                 program.get(*id + local_address)
             } else {
                 program.get(*id)
             }
             .expect("Variable not found")
             .clone(),
-            CompiledExpression::Lit(val) => val.clone(),
-            CompiledExpression::Oper(op_code, left, right) => match op_code {
+            LinearizedExpression::Lit(val) => val.clone(),
+            LinearizedExpression::Oper(op_code, left, right) => match op_code {
                 Operator::Add => (left.evaluate(program, local_address, next_frame)
                     + right.evaluate(program, local_address, next_frame))
                 .expect("Failed to add"),
@@ -271,55 +271,55 @@ mod tests {
                 vec![0],
                 3,
                 vec![
-                    CompiledInstruction::AssignLiteral(1, Value::Integer(3)),
-                    CompiledInstruction::AssignLiteral(2, Value::Integer(3)),
-                    CompiledInstruction::ConditionalJump(
-                        CompiledExpression::Oper(
+                    LinearizedInstruction::AssignLiteral(1, Value::Integer(3)),
+                    LinearizedInstruction::AssignLiteral(2, Value::Integer(3)),
+                    LinearizedInstruction::ConditionalJump(
+                        LinearizedExpression::Oper(
                             Operator::Neq,
-                            Box::new(CompiledExpression::Var(0)),
-                            Box::new(CompiledExpression::Lit(Value::Integer(0))),
+                            Box::new(LinearizedExpression::Var(0)),
+                            Box::new(LinearizedExpression::Lit(Value::Integer(0))),
                         ),
                         3,
                         10,
                     ),
-                    CompiledInstruction::Assign(
+                    LinearizedInstruction::Assign(
                         0,
-                        CompiledExpression::Oper(
+                        LinearizedExpression::Oper(
                             Operator::Subtract,
-                            Box::new(CompiledExpression::Var(0)),
-                            Box::new(CompiledExpression::Lit(Value::Integer(1))),
+                            Box::new(LinearizedExpression::Var(0)),
+                            Box::new(LinearizedExpression::Lit(Value::Integer(1))),
                         ),
                     ),
-                    CompiledInstruction::ConditionalJump(
-                        CompiledExpression::Oper(
+                    LinearizedInstruction::ConditionalJump(
+                        LinearizedExpression::Oper(
                             Operator::Neq,
-                            Box::new(CompiledExpression::Var(1)),
-                            Box::new(CompiledExpression::Lit(Value::Integer(0))),
+                            Box::new(LinearizedExpression::Var(1)),
+                            Box::new(LinearizedExpression::Lit(Value::Integer(0))),
                         ),
                         5,
                         8,
                     ),
-                    CompiledInstruction::Assign(
+                    LinearizedInstruction::Assign(
                         1,
-                        CompiledExpression::Oper(
+                        LinearizedExpression::Oper(
                             Operator::Subtract,
-                            Box::new(CompiledExpression::Var(1)),
-                            Box::new(CompiledExpression::Lit(Value::Integer(1))),
+                            Box::new(LinearizedExpression::Var(1)),
+                            Box::new(LinearizedExpression::Lit(Value::Integer(1))),
                         ),
                     ),
-                    CompiledInstruction::Assign(
+                    LinearizedInstruction::Assign(
                         2,
-                        CompiledExpression::Oper(
+                        LinearizedExpression::Oper(
                             Operator::Add,
-                            Box::new(CompiledExpression::Var(1)),
-                            Box::new(CompiledExpression::Var(2)),
+                            Box::new(LinearizedExpression::Var(1)),
+                            Box::new(LinearizedExpression::Var(2)),
                         ),
                     ),
-                    CompiledInstruction::Goto(4),
-                    CompiledInstruction::Assign(1, CompiledExpression::Var(2)),
-                    CompiledInstruction::Goto(2),
+                    LinearizedInstruction::Goto(4),
+                    LinearizedInstruction::Assign(1, LinearizedExpression::Var(2)),
+                    LinearizedInstruction::Goto(2),
                 ],
-                CompiledExpression::Var(1),
+                LinearizedExpression::Var(1),
             ))),
         ]);
 
@@ -339,52 +339,52 @@ mod tests {
                 vec![0],
                 2,
                 vec![
-                    CompiledInstruction::ConditionalJump(
-                        CompiledExpression::Oper(
+                    LinearizedInstruction::ConditionalJump(
+                        LinearizedExpression::Oper(
                             Operator::Eq,
-                            Box::new(CompiledExpression::Var(0)),
-                            Box::new(CompiledExpression::Lit(Value::Integer(1))),
+                            Box::new(LinearizedExpression::Var(0)),
+                            Box::new(LinearizedExpression::Lit(Value::Integer(1))),
                         ),
                         1,
                         3,
                     ),
-                    CompiledInstruction::AssignLiteral(1, Value::Integer(1)),
-                    CompiledInstruction::Goto(7),
-                    CompiledInstruction::ConditionalJump(
-                        CompiledExpression::Oper(
+                    LinearizedInstruction::AssignLiteral(1, Value::Integer(1)),
+                    LinearizedInstruction::Goto(7),
+                    LinearizedInstruction::ConditionalJump(
+                        LinearizedExpression::Oper(
                             Operator::Eq,
-                            Box::new(CompiledExpression::Var(0)),
-                            Box::new(CompiledExpression::Lit(Value::Integer(2))),
+                            Box::new(LinearizedExpression::Var(0)),
+                            Box::new(LinearizedExpression::Lit(Value::Integer(2))),
                         ),
                         4,
                         6,
                     ),
-                    CompiledInstruction::AssignLiteral(1, Value::Integer(1)),
-                    CompiledInstruction::Goto(7),
-                    CompiledInstruction::Assign(
+                    LinearizedInstruction::AssignLiteral(1, Value::Integer(1)),
+                    LinearizedInstruction::Goto(7),
+                    LinearizedInstruction::Assign(
                         1,
-                        CompiledExpression::Oper(
+                        LinearizedExpression::Oper(
                             Operator::Add,
-                            Box::new(CompiledExpression::Call(
-                                Box::new(CompiledExpression::Var(3)),
-                                vec![CompiledExpression::Oper(
+                            Box::new(LinearizedExpression::Call(
+                                Box::new(LinearizedExpression::Var(3)),
+                                vec![LinearizedExpression::Oper(
                                     Operator::Subtract,
-                                    Box::new(CompiledExpression::Var(0)),
-                                    Box::new(CompiledExpression::Lit(Value::Integer(1))),
+                                    Box::new(LinearizedExpression::Var(0)),
+                                    Box::new(LinearizedExpression::Lit(Value::Integer(1))),
                                 )],
                             )),
-                            Box::new(CompiledExpression::Call(
-                                Box::new(CompiledExpression::Var(3)),
-                                vec![CompiledExpression::Oper(
+                            Box::new(LinearizedExpression::Call(
+                                Box::new(LinearizedExpression::Var(3)),
+                                vec![LinearizedExpression::Oper(
                                     Operator::Subtract,
-                                    Box::new(CompiledExpression::Var(0)),
-                                    Box::new(CompiledExpression::Lit(Value::Integer(2))),
+                                    Box::new(LinearizedExpression::Var(0)),
+                                    Box::new(LinearizedExpression::Lit(Value::Integer(2))),
                                 )],
                             )),
                         ),
                     ),
                 ],
-                CompiledExpression::Var(1),
+                LinearizedExpression::Var(1),
             ))),
         ]);
         assert_eq!(
