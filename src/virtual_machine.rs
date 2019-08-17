@@ -21,7 +21,6 @@ pub struct CompiledFunction {
     arguments: usize,
     capacity: usize,
     instructions: Vec<LinearizedInstruction>,
-    ret_val: LinearizedExpression,
 }
 
 ///Represents a scripting language program
@@ -60,13 +59,11 @@ impl CompiledFunction {
         arguments: usize,
         capacity: usize,
         instructions: Vec<LinearizedInstruction>,
-        ret_val: LinearizedExpression,
     ) -> Self {
         CompiledFunction {
             arguments,
             capacity,
             instructions,
-            ret_val,
         }
     }
     /// Calls self with specified args and specified global state
@@ -84,8 +81,7 @@ impl CompiledFunction {
                 current_instruction += 1;
             }
         }
-        self.ret_val
-            .evaluate(program, local_address, local_address + self.capacity)
+        program.variables[local_address].clone()
     }
 }
 
@@ -350,8 +346,8 @@ mod tests {
                     LinearizedInstruction::Goto(7),
                     LinearizedInstruction::CopyRelative(1, 2),
                     LinearizedInstruction::Goto(4),
+                    LinearizedInstruction::CopyRelative(0, 1),
                 ],
-                LinearizedExpression::Var(1),
             ))),
         ]);
 
@@ -377,11 +373,11 @@ mod tests {
                     LinearizedInstruction::AssignLiteral(4, Value::Integer(2)),
                     LinearizedInstruction::Eq(1, 0, 3),
                     LinearizedInstruction::ConditionalJump(1, 4, 6),
-                    LinearizedInstruction::AssignLiteral(1, Value::Integer(1)),
+                    LinearizedInstruction::AssignLiteral(0, Value::Integer(1)),
                     LinearizedInstruction::Goto(15),
                     LinearizedInstruction::Eq(1, 0, 4),
                     LinearizedInstruction::ConditionalJump(1, 8, 10),
-                    LinearizedInstruction::AssignLiteral(1, Value::Integer(1)),
+                    LinearizedInstruction::AssignLiteral(0, Value::Integer(1)),
                     LinearizedInstruction::Goto(15),
                     LinearizedInstruction::Subtract(1, 0, 3),
                     LinearizedInstruction::Assign(
@@ -399,9 +395,8 @@ mod tests {
                             vec![LinearizedExpression::Var(2)],
                         ),
                     ),
-                    LinearizedInstruction::Add(1, 1, 2),
+                    LinearizedInstruction::Add(0, 1, 2),
                 ],
-                LinearizedExpression::Var(1),
             ))),
         ]);
         assert_eq!(
