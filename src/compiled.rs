@@ -36,6 +36,7 @@ pub(crate) enum LinearizedInstruction {
     Assign(usize, LinearizedExpression),
     AssignLiteral(usize, Value),
     CopyRelative(usize, usize),
+    Add(usize, usize, usize),
     Goto(usize),
     ConditionalJump(LinearizedExpression, usize, usize),
 }
@@ -45,7 +46,11 @@ pub(crate) enum LinearizedExpression {
     Call(Box<LinearizedExpression>, Vec<LinearizedExpression>),
     Var(usize),
     Lit(Value),
-    Oper(Operator, Box<LinearizedExpression>, Box<LinearizedExpression>),
+    Oper(
+        Operator,
+        Box<LinearizedExpression>,
+        Box<LinearizedExpression>,
+    ),
 }
 
 impl CompiledFunction {
@@ -102,6 +107,14 @@ impl LinearizedInstruction {
             }
             LinearizedInstruction::CopyRelative(name, var_address) => {
                 program.copy(*name + local_address, var_address + local_address);
+                None
+            }
+            LinearizedInstruction::Add(name, left, right) => {
+                program.add(
+                    name + local_address,
+                    left + local_address,
+                    right + local_address,
+                );
                 None
             }
             LinearizedInstruction::Goto(line) => Some(*line),
@@ -250,10 +263,14 @@ impl Program {
         }
         self.variables[key] = value;
     }
-    pub fn copy(&mut self, destination: usize, origin: usize) {
+    fn copy(&mut self, destination: usize, origin: usize) {
         if let Some(n) = self.variables.get(origin) {
             self.variables[destination] = n.clone();
         }
+    }
+    fn add(&mut self, destination: usize, left: usize, right: usize) {
+        self.variables[destination] =
+            (self.variables[left].clone() + self.variables[right].clone()).expect("failed to add");
     }
     ///Returns the corresponding value if key is in the State, and None otherwise
     pub fn get(&self, key: usize) -> Option<&Value> {
@@ -317,14 +334,7 @@ mod tests {
                             Box::new(LinearizedExpression::Lit(Value::Integer(1))),
                         ),
                     ),
-                    LinearizedInstruction::Assign(
-                        2,
-                        LinearizedExpression::Oper(
-                            Operator::Add,
-                            Box::new(LinearizedExpression::Var(1)),
-                            Box::new(LinearizedExpression::Var(2)),
-                        ),
-                    ),
+                    LinearizedInstruction::Add(2, 1, 2),
                     LinearizedInstruction::Goto(4),
                     LinearizedInstruction::CopyRelative(1, 2),
                     LinearizedInstruction::Goto(2),
@@ -347,7 +357,7 @@ mod tests {
             Value::Integer(7),
             Value::Function(Box::new(CompiledFunction::from_raw(
                 vec![0],
-                2,
+                3,
                 vec![
                     LinearizedInstruction::ConditionalJump(
                         LinearizedExpression::Oper(
@@ -359,7 +369,7 @@ mod tests {
                         3,
                     ),
                     LinearizedInstruction::AssignLiteral(1, Value::Integer(1)),
-                    LinearizedInstruction::Goto(7),
+                    LinearizedInstruction::Goto(9),
                     LinearizedInstruction::ConditionalJump(
                         LinearizedExpression::Oper(
                             Operator::Eq,
@@ -370,29 +380,30 @@ mod tests {
                         6,
                     ),
                     LinearizedInstruction::AssignLiteral(1, Value::Integer(1)),
-                    LinearizedInstruction::Goto(7),
+                    LinearizedInstruction::Goto(9),
                     LinearizedInstruction::Assign(
                         1,
-                        LinearizedExpression::Oper(
-                            Operator::Add,
-                            Box::new(LinearizedExpression::Call(
-                                Box::new(LinearizedExpression::Var(3)),
-                                vec![LinearizedExpression::Oper(
-                                    Operator::Subtract,
-                                    Box::new(LinearizedExpression::Var(0)),
-                                    Box::new(LinearizedExpression::Lit(Value::Integer(1))),
-                                )],
-                            )),
-                            Box::new(LinearizedExpression::Call(
-                                Box::new(LinearizedExpression::Var(3)),
-                                vec![LinearizedExpression::Oper(
-                                    Operator::Subtract,
-                                    Box::new(LinearizedExpression::Var(0)),
-                                    Box::new(LinearizedExpression::Lit(Value::Integer(2))),
-                                )],
-                            )),
+                        LinearizedExpression::Call(
+                            Box::new(LinearizedExpression::Var(3)),
+                            vec![LinearizedExpression::Oper(
+                                Operator::Subtract,
+                                Box::new(LinearizedExpression::Var(0)),
+                                Box::new(LinearizedExpression::Lit(Value::Integer(1))),
+                            )],
                         ),
                     ),
+                    LinearizedInstruction::Assign(
+                        2,
+                        LinearizedExpression::Call(
+                            Box::new(LinearizedExpression::Var(3)),
+                            vec![LinearizedExpression::Oper(
+                                Operator::Subtract,
+                                Box::new(LinearizedExpression::Var(0)),
+                                Box::new(LinearizedExpression::Lit(Value::Integer(2))),
+                            )],
+                        ),
+                    ),
+                    LinearizedInstruction::Add(1, 1, 2),
                 ],
                 LinearizedExpression::Var(1),
             ))),
