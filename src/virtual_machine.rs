@@ -1,5 +1,4 @@
 use crate::ast::Operator;
-use crate::virtual_machine::Value::Integer;
 use std::ops::{Add, Mul, Sub};
 
 //The structs in this module currently overlap with most of the functionality from ast.rs
@@ -286,7 +285,7 @@ impl Program {
     ///Inserts a value into the State with specified key.
     pub fn insert(&mut self, key: usize, value: Value) {
         while key >= self.variables.len() {
-            self.variables.push(Integer(0));
+            self.variables.push(Value::Integer(0));
         }
         self.variables[key] = value;
     }
