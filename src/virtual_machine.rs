@@ -18,7 +18,7 @@ pub enum Value {
 ///A compiled scripting language function
 #[derive(Debug, PartialEq, Clone)]
 pub struct CompiledFunction {
-    arguments: Vec<usize>,
+    arguments: usize,
     capacity: usize,
     instructions: Vec<LinearizedInstruction>,
     ret_val: LinearizedExpression,
@@ -57,7 +57,7 @@ pub(crate) enum LinearizedExpression {
 
 impl CompiledFunction {
     pub(crate) fn from_raw(
-        arguments: Vec<usize>,
+        arguments: usize,
         capacity: usize,
         instructions: Vec<LinearizedInstruction>,
         ret_val: LinearizedExpression,
@@ -71,8 +71,7 @@ impl CompiledFunction {
     }
     /// Calls self with specified args and specified global state
     pub fn call(&self, args: Vec<Value>, program: &mut Program, local_address: usize) -> Value {
-        self.arguments
-            .iter()
+        (0..self.arguments)
             .zip(args)
             .for_each(|(name, value)| program.insert(name + local_address, value));
         let mut current_instruction = 0;
@@ -334,7 +333,7 @@ mod tests {
         let mut program = Program::from(vec![
             Value::Integer(7),
             Value::Function(Box::new(CompiledFunction::from_raw(
-                vec![0],
+                1,
                 6,
                 vec![
                     LinearizedInstruction::AssignLiteral(4, Value::Integer(0)),
@@ -371,7 +370,7 @@ mod tests {
             Value::Integer(7),
             Value::Integer(7),
             Value::Function(Box::new(CompiledFunction::from_raw(
-                vec![0],
+                1,
                 5,
                 vec![
                     LinearizedInstruction::AssignLiteral(3, Value::Integer(1)),
