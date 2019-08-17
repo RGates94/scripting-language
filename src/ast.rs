@@ -1,7 +1,7 @@
 use crate::parser::from_str;
 use fnv::FnvHashMap;
-use std::ops::{Add, Mul, Sub};
 use shrinkwraprs::Shrinkwrap;
+use std::ops::{Add, Mul, Sub};
 
 /// Representation of any value in the scripting language, each variant is a data type.
 #[derive(Debug, PartialEq, Clone)]
