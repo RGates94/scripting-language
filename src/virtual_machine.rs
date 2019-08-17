@@ -108,7 +108,13 @@ impl LinearizedInstruction {
             }
             LinearizedInstruction::Call(function, args) => {
                 if let Value::Function(f) = program.variables[*function].clone() {
-                    f.call(args.iter().map(|x| program.variables[*x + local_address].clone()).collect(), program, next_frame);
+                    f.call(
+                        args.iter()
+                            .map(|x| program.variables[*x + local_address].clone())
+                            .collect(),
+                        program,
+                        next_frame,
+                    );
                 } else {
                     panic!("Tried to call non-function")
                 };
@@ -367,7 +373,7 @@ mod tests {
         ]);
 
         assert_eq!(
-            program.run(1, vec![Value::Integer(6)]),
+            program.run(1, vec![Value::Integer(4)]),
             Some(Value::Integer(26_796))
         );
     }
