@@ -1,4 +1,3 @@
-use crate::ast::Operator;
 use std::ops::{Add, Mul, Sub};
 
 //The structs in this module currently overlap with most of the functionality from ast.rs
@@ -31,7 +30,6 @@ pub struct Program {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum LinearizedInstruction {
-    Assign(usize, LinearizedExpression),
     AssignLiteral(usize, Value),
     CopyRelative(usize, usize),
     Call(usize, Vec<usize>),
@@ -41,18 +39,6 @@ pub(crate) enum LinearizedInstruction {
     Neq(usize, usize, usize),
     Goto(usize),
     ConditionalJump(usize, usize, usize),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub(crate) enum LinearizedExpression {
-    Call(Box<LinearizedExpression>, Vec<LinearizedExpression>),
-    Var(usize),
-    Lit(Value),
-    Oper(
-        Operator,
-        Box<LinearizedExpression>,
-        Box<LinearizedExpression>,
-    ),
 }
 
 impl CompiledFunction {
@@ -93,11 +79,6 @@ impl LinearizedInstruction {
         next_frame: usize,
     ) -> Option<usize> {
         match self {
-            LinearizedInstruction::Assign(name, expr) => {
-                let ret = expr.evaluate(program, local_address, next_frame);
-                program.insert(*name + local_address, ret);
-                None
-            }
             LinearizedInstruction::AssignLiteral(name, val) => {
                 program.insert(*name + local_address, val.clone());
                 None
@@ -160,61 +141,6 @@ impl LinearizedInstruction {
                     Some(*otherwise)
                 }
             }
-        }
-    }
-}
-
-impl LinearizedExpression {
-    pub fn evaluate(
-        &self,
-        program: &mut Program,
-        local_address: usize,
-        next_frame: usize,
-    ) -> Value {
-        match self {
-            LinearizedExpression::Call(name, args) => {
-                match name.evaluate(program, local_address, next_frame) {
-                    Value::Function(inner) => {
-                        inner.call(
-                            args.iter()
-                                .map(|expr| expr.evaluate(program, local_address, next_frame))
-                                .collect(),
-                            program,
-                            next_frame,
-                        );
-                        program.variables[next_frame].clone()
-                    }
-                    _ => panic!("Tried to call a non-function value"),
-                }
-            }
-            LinearizedExpression::Var(id) => if *id + local_address < next_frame {
-                program.get(*id + local_address)
-            } else {
-                program.get(*id)
-            }
-            .expect("Variable not found")
-            .clone(),
-            LinearizedExpression::Lit(val) => val.clone(),
-            LinearizedExpression::Oper(op_code, left, right) => match op_code {
-                Operator::Add => (left.evaluate(program, local_address, next_frame)
-                    + right.evaluate(program, local_address, next_frame))
-                .expect("Failed to add"),
-                Operator::Subtract => (left.evaluate(program, local_address, next_frame)
-                    - right.evaluate(program, local_address, next_frame))
-                .expect("Failed to add"),
-                Operator::Multiply => (left.evaluate(program, local_address, next_frame)
-                    * right.evaluate(program, local_address, next_frame))
-                .expect("Failed to add"),
-                Operator::Eq => Value::Boolean(
-                    left.evaluate(program, local_address, next_frame)
-                        == right.evaluate(program, local_address, next_frame),
-                ),
-                Operator::Neq => Value::Boolean(
-                    left.evaluate(program, local_address, next_frame)
-                        != right.evaluate(program, local_address, next_frame),
-                ),
-                _ => panic!("Not implemented"),
-            },
         }
     }
 }
