@@ -319,7 +319,7 @@ mod tests {
         ]);
 
         assert_eq!(
-            program.run(1, vec![Value::Integer(6)]),
+            program.run(1, vec![Value::Integer(4)]),
             Some(Value::Integer(26_796))
         );
     }
