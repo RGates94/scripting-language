@@ -34,6 +34,7 @@ pub struct Program {
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum CompiledInstruction {
     Assign(usize, CompiledExpression),
+    AssignLiteral(usize, Value),
     Goto(usize),
     ConditionalJump(CompiledExpression, usize, usize),
 }
@@ -92,6 +93,10 @@ impl CompiledInstruction {
             CompiledInstruction::Assign(name, expr) => {
                 let ret = expr.evaluate(program, local_address, next_frame);
                 program.insert(*name + local_address, ret);
+                None
+            }
+            CompiledInstruction::AssignLiteral(name, val) => {
+                program.insert(*name + local_address, val.clone());
                 None
             }
             CompiledInstruction::Goto(line) => Some(*line),
@@ -266,8 +271,8 @@ mod tests {
                 vec![0],
                 3,
                 vec![
-                    CompiledInstruction::Assign(1, CompiledExpression::Lit(Value::Integer(3))),
-                    CompiledInstruction::Assign(2, CompiledExpression::Lit(Value::Integer(3))),
+                    CompiledInstruction::AssignLiteral(1, Value::Integer(3)),
+                    CompiledInstruction::AssignLiteral(2, Value::Integer(3)),
                     CompiledInstruction::ConditionalJump(
                         CompiledExpression::Oper(
                             Operator::Neq,
@@ -343,7 +348,7 @@ mod tests {
                         1,
                         3,
                     ),
-                    CompiledInstruction::Assign(1, CompiledExpression::Lit(Value::Integer(1))),
+                    CompiledInstruction::AssignLiteral(1, Value::Integer(1)),
                     CompiledInstruction::Goto(7),
                     CompiledInstruction::ConditionalJump(
                         CompiledExpression::Oper(
@@ -354,7 +359,7 @@ mod tests {
                         4,
                         6,
                     ),
-                    CompiledInstruction::Assign(1, CompiledExpression::Lit(Value::Integer(1))),
+                    CompiledInstruction::AssignLiteral(1, Value::Integer(1)),
                     CompiledInstruction::Goto(7),
                     CompiledInstruction::Assign(
                         1,
