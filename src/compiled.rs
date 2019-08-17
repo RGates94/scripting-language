@@ -35,6 +35,7 @@ pub struct Program {
 pub(crate) enum LinearizedInstruction {
     Assign(usize, LinearizedExpression),
     AssignLiteral(usize, Value),
+    CopyRelative(usize, usize),
     Goto(usize),
     ConditionalJump(LinearizedExpression, usize, usize),
 }
@@ -97,6 +98,10 @@ impl LinearizedInstruction {
             }
             LinearizedInstruction::AssignLiteral(name, val) => {
                 program.insert(*name + local_address, val.clone());
+                None
+            }
+            LinearizedInstruction::CopyRelative(name, var_address) => {
+                program.copy(*name + local_address, var_address + local_address);
                 None
             }
             LinearizedInstruction::Goto(line) => Some(*line),
@@ -245,6 +250,11 @@ impl Program {
         }
         self.variables[key] = value;
     }
+    pub fn copy(&mut self, destination: usize, origin: usize) {
+        if let Some(n) = self.variables.get(origin) {
+            self.variables[destination] = n.clone();
+        }
+    }
     ///Returns the corresponding value if key is in the State, and None otherwise
     pub fn get(&self, key: usize) -> Option<&Value> {
         self.variables.get(key)
@@ -316,7 +326,7 @@ mod tests {
                         ),
                     ),
                     LinearizedInstruction::Goto(4),
-                    LinearizedInstruction::Assign(1, LinearizedExpression::Var(2)),
+                    LinearizedInstruction::CopyRelative(1, 2),
                     LinearizedInstruction::Goto(2),
                 ],
                 LinearizedExpression::Var(1),
