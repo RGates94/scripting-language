@@ -9,8 +9,8 @@ pub enum Value {
     Integer(i64),
     Float(f64),
     Boolean(bool),
-    Text(String),
-    Array(Vec<Value>),
+    Text(Box<String>),
+    Array(Box<Vec<Value>>),
     Function(Box<CompiledFunction>),
 }
 
@@ -152,19 +152,19 @@ impl Add for Value {
             Value::Integer(lhs) => match rhs {
                 Value::Integer(rhs) => Some(Value::Integer(lhs + rhs)),
                 Value::Float(rhs) => Some(Value::Float(lhs as f64 + rhs)),
-                Value::Text(rhs) => Some(Value::Text(format!("{}{}", lhs, rhs))),
+                Value::Text(rhs) => Some(Value::Text(Box::new(format!("{}{}", lhs, rhs)))),
                 _ => None,
             },
             Value::Float(lhs) => match rhs {
                 Value::Integer(rhs) => Some(Value::Float(lhs + rhs as f64)),
                 Value::Float(rhs) => Some(Value::Float(lhs + rhs)),
-                Value::Text(rhs) => Some(Value::Text(format!("{}{}", lhs, rhs))),
+                Value::Text(rhs) => Some(Value::Text(Box::new(format!("{}{}", lhs, rhs)))),
                 _ => None,
             },
             Value::Text(lhs) => match rhs {
-                Value::Integer(rhs) => Some(Value::Text(format!("{}{}", lhs, rhs))),
-                Value::Float(rhs) => Some(Value::Text(format!("{}{}", lhs, rhs))),
-                Value::Text(rhs) => Some(Value::Text(format!("{}{}", lhs, rhs))),
+                Value::Integer(rhs) => Some(Value::Text(Box::new(format!("{}{}", lhs, rhs)))),
+                Value::Float(rhs) => Some(Value::Text(Box::new(format!("{}{}", lhs, rhs)))),
+                Value::Text(rhs) => Some(Value::Text(Box::new(format!("{}{}", lhs, rhs)))),
                 _ => None,
             },
             _ => None,
